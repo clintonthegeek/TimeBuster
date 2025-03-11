@@ -11,6 +11,9 @@ qt_add_executable(TimeBuster
     mainwindow.cpp
     mainwindow.h
     mainwindow.ui
+    calendaritem.h calendaritem.cpp
+    cal.h cal.cpp
+    calendarview.h calendarview.cpp
 )
 
 target_link_libraries(TimeBuster

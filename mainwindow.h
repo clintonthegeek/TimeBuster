@@ -2,8 +2,10 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QMdiSubWindow> // Added for MDI wrapping
 
 class CollectionManager; // Forward declaration - stub for now
+class Cal; // Forward declaration - for addCalendarView
 
 namespace Ui {
 class MainWindow;
@@ -24,6 +26,8 @@ private slots:
     void syncCollections();
 
 private:
+    void addCalendarView(Cal *cal); // Updated to wrap in QMdiSubWindow
+
     Ui::MainWindow *ui;
     CollectionManager *collectionManager; // Stubbed - null for now
 };
