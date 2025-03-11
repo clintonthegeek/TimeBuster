@@ -15,6 +15,7 @@ class CalDAVBackend : public SyncBackend
 
 public:
     explicit CalDAVBackend(const QString &serverUrl, const QString &username, const QString &password, QObject *parent = nullptr);
+    virtual ~CalDAVBackend(); // Ensure virtual destructor is declared
 
     QList<CalendarMetadata> fetchCalendars(const QString &collectionId) override;
     QList<CalendarItem*> fetchItems(Cal *cal) override;
@@ -41,7 +42,13 @@ private:
     QString m_serverUrl;
     QString m_username;
     QString m_password;
+    QMap<QString, Cal*> m_calMap; // Map calId to Cal* for async access
     QMap<QString, QString> m_idToUrl;
+
+    // Getters and setters for m_calMap (optional but good practice)
+    Cal* getCal(const QString &calId) const { return m_calMap.value(calId); }
+    void setCal(const QString &calId, Cal *cal) { m_calMap.insert(calId, cal); }
+    void removeCal(const QString &calId) { m_calMap.remove(calId); }
 };
 
 #endif // CALDAVBACKEND_H

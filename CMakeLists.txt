@@ -30,6 +30,8 @@ qt_add_executable(TimeBuster
     credentialsdialog.h credentialsdialog.cpp
     collectioninfowidget.h collectioninfowidget.cpp
     databasemanager.h databasemanager.cpp
+    sessionmanager.h sessionmanager.cpp
+    calendaritemfactory.h calendaritemfactory.cpp
 )
 
 target_link_libraries(TimeBuster

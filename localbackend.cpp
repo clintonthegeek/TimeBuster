@@ -1,6 +1,7 @@
 #include "localbackend.h"
 #include "cal.h"
 #include "databasemanager.h"
+#include "calendaritemfactory.h"
 #include <KCalendarCore/ICalFormat>
 #include <KCalendarCore/MemoryCalendar>
 #include <QDir>
@@ -131,9 +132,8 @@ void LocalBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
 
     KCalendarCore::ICalFormat format;
     for (const CalendarItem *item : items) {
-        // Clone the item to avoid ownership conflicts
-        CalendarItem *clonedItem = item->clone();
-        if (!clonedItem) {
+        CalendarItem *clonedItem = CalendarItemFactory::createItem(item->id(), item->incidence(), nullptr);
+        if (clonedItem) {
             qDebug() << "LocalBackend: Failed to clone item" << item->id();
             continue;
         }
