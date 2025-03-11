@@ -1,12 +1,16 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "calendarview.h" // Added for CalendarView
-#include "collection.h"
+#include "calendarview.h"
+#include "collectionmanager.h" // Added
+#include "localbackend.h"
+#include "caldavbackend.h"
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow), collectionManager(nullptr)
+    : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    collectionManager = new CollectionManager(this); // Initialize it
 
     // Connect menu actions to slots
     connect(ui->actionAddLocalCollection, &QAction::triggered, this, &MainWindow::addLocalCollection);
@@ -14,17 +18,15 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::createLocalFromRemote);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
 
-    // In MainWindow constructor, after connect() calls
-    Collection *col = new Collection("col1", "Test Collection", this);
-    for (Cal *cal : col->calendars()) {
-        addCalendarView(cal);
-    }
+    // Connect CollectionManager signal
+    connect(collectionManager, &CollectionManager::collectionAdded, this, &MainWindow::onCollectionAdded);
+
+    // Remove your test code - handled by addLocalCollection now
 }
 
 MainWindow::~MainWindow()
 {
-    delete ui;
-    // collectionManager is null for now, no cleanup needed
+    delete ui; // Deletes collectionManager too, as it's a child
 }
 
 void MainWindow::addCalendarView(Cal *cal)
@@ -34,20 +36,23 @@ void MainWindow::addCalendarView(Cal *cal)
     subWindow->setWidget(view);
     subWindow->setWindowTitle(cal->displayName());
     ui->mdiArea->addSubWindow(subWindow);
-    subWindow->resize(400, 300); // Match CalendarView's default size
+    subWindow->resize(400, 300);
     subWindow->show();
 }
 
+// Update addLocalCollection
 void MainWindow::addLocalCollection()
 {
-    Cal *cal = new Cal("cal1", "Test Calendar", this);
-    addCalendarView(cal);
-    ui->logTextEdit->append("Added local calendar: Test Calendar");
+    LocalBackend *backend = new LocalBackend("", this); // Empty path - stubbed
+    collectionManager->addCollection("Local Collection", backend);
+    ui->logTextEdit->append("Added local collection with LocalBackend");
 }
 
 void MainWindow::addRemoteCollection()
 {
-    ui->logTextEdit->append("Add Remote Collection triggered (stub)");
+    CalDAVBackend *backend = new CalDAVBackend("http://fake.cal.dav", "user", "pass", this); // Fake creds
+    collectionManager->addCollection("Remote Collection", backend);
+    ui->logTextEdit->append("Added remote collection with CalDAVBackend");
 }
 
 void MainWindow::createLocalFromRemote()
@@ -58,4 +63,12 @@ void MainWindow::createLocalFromRemote()
 void MainWindow::syncCollections()
 {
     ui->logTextEdit->append("Sync Collections triggered (stub)");
+}
+
+void MainWindow::onCollectionAdded(Collection *collection)
+{
+    for (Cal *cal : collection->calendars()) {
+        addCalendarView(cal);
+    }
+    ui->logTextEdit->append("Collection added with " + QString::number(collection->calendars().size()) + " calendars");
 }
