@@ -42,6 +42,27 @@ void CollectionManager::addCollection(const QString &name, SyncBackend *initialB
     }
 }
 
+void CollectionManager::addBackend(const QString &collectionId, SyncBackend *backend)
+{
+    if (!m_collections.contains(collectionId)) {
+        qDebug() << "CollectionManager: Cannot add backend to unknown collection" << collectionId;
+        return;
+    }
+    m_collectionBackends[collectionId].append(backend);
+    backend->setParent(this); // Take ownership
+    qDebug() << "CollectionManager: Added backend to" << collectionId;
+}
+
+void CollectionManager::saveBackendConfig(const QString &collectionId, const QString &kalbPath)
+{
+    if (!m_collectionBackends.contains(collectionId)) {
+        qDebug() << "CollectionManager: No backends to save for" << collectionId;
+        return;
+    }
+    m_configManager->saveBackendConfig(collectionId, m_collectionBackends[collectionId], kalbPath);
+    qDebug() << "CollectionManager: Saved backend config for" << collectionId << "to" << kalbPath;
+}
+
 void CollectionManager::onItemsFetched(const QString &calId, const QList<CalendarItem*> &items)
 {
     qDebug() << "CollectionManager: onItemsFetched for" << calId << "with" << items.size() << "items";
@@ -75,4 +96,23 @@ void CollectionManager::onCalendarsFetched(const QString &collectionId, const QL
     }
     qDebug() << "CollectionManager: Emitting collectionAdded for" << collectionId;
     emit collectionAdded(col);
+}
+
+QList<SyncBackend*> CollectionManager::loadBackendConfig(const QString &collectionId, const QString &kalbPath)
+{
+    return m_configManager->loadBackendConfig(collectionId, kalbPath);
+}
+
+void CollectionManager::setConfigBasePath(const QString &path)
+{
+    m_configManager->setBasePath(path);
+}
+
+void CollectionManager::setBackends(const QString &collectionId, const QList<SyncBackend*> &backends)
+{
+    m_collectionBackends[collectionId] = backends;
+    for (SyncBackend *backend : backends) {
+        backend->setParent(this); // Ownership
+    }
+    qDebug() << "CollectionManager: Set backends for" << collectionId;
 }

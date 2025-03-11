@@ -239,16 +239,16 @@ void CalDAVBackend::fetchItemData(const QString &calId, const KDAV::DavItem::Lis
 }
 
 
-QList<CalendarItem*> CalDAVBackend::fetchItems(const QString &calId)
+QList<CalendarItem*> CalDAVBackend::fetchItems(Cal *cal)
 {
-    qDebug() << "CalDAVBackend: Queuing fetchItems for" << calId;
-    if (!m_idToUrl.contains(calId)) {
-        qDebug() << "CalDAVBackend: Unknown calId" << calId;
+    qDebug() << "CalDAVBackend: Queuing fetchItems for" << cal->id();
+    if (!m_idToUrl.contains(cal->id())) {
+        qDebug() << "CalDAVBackend: Unknown calId" << cal->id();
         emit dataFetched();
         return QList<CalendarItem*>();
     }
 
-    m_itemFetchQueue.append(calId);
+    m_itemFetchQueue.append(cal->id());
     if (m_itemFetchQueue.size() == 1) {
         processNextItemFetch(); // Start if queue was empty
     }
@@ -263,8 +263,7 @@ void CalDAVBackend::storeCalendars(const QString &collectionId, const QList<Cal*
     }
 }
 
-void CalDAVBackend::storeItems(const QString &calId, const QList<CalendarItem*> &items)
+void CalDAVBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
 {
-    qDebug() << "CalDAVBackend: storeItems stub for" << calId;
-    Q_UNUSED(items);
+    qDebug() << "CalDAVBackend: storeItems stub for" << cal->id();
 }

@@ -34,6 +34,7 @@ private slots:
 
 private:
     void addCalendarView(Cal *cal);
+    void updateCollectionInfo(); // Added
     CredentialsDialog *credentialsDialog; // New - owned
 
     Ui::MainWindow *ui;

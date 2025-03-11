@@ -29,8 +29,8 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
 private:
-    QString m_id;
-    QString m_name;
+    QString m_id; // Raw ID, e.g., "https://.../personal/"
+    QString m_name; // Clean name, e.g., "personal"
     QList<CalendarItem*> m_items;
 };
 

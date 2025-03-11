@@ -14,6 +14,12 @@ CredentialsDialog::CredentialsDialog(QWidget *parent)
     okButton = new QPushButton("OK", this);
     cancelButton = new QPushButton("Cancel", this);
 
+    serverUrlEdit->insert("https://my.opendesktop.org/remote.php/dav/calendars/");
+    usernameEdit->insert("clintonthegeek");
+    passwordEdit->insert("A9QAeL5GcrvAepkc");
+
+
+
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(new QLabel("Server URL (e.g., https://caldav.example.com):", this));
     layout->addWidget(serverUrlEdit);

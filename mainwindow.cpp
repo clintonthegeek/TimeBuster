@@ -55,14 +55,85 @@ void MainWindow::addCalendarView(Cal *cal)
 
 void MainWindow::attachToLocal()
 {
-    ui->logTextEdit->append("Attach To Local triggered (stub)");
+    if (!activeCollection) {
+        ui->logTextEdit->append("No remote collection to attach to!");
+        return;
+    }
 
+    QString kalbPath = QFileDialog::getSaveFileName(this, "Save .kalb File", "", "*.kalb");
+    if (kalbPath.isEmpty()) return;
+
+    QString rootPath = QFileInfo(kalbPath).absolutePath();
+    LocalBackend *localBackend = new LocalBackend(rootPath, this);
+    collectionManager->addBackend(activeCollection->id(), localBackend);
+    collectionManager->saveBackendConfig(activeCollection->id(), kalbPath);
+
+    for (Cal *cal : activeCollection->calendars()) {
+        localBackend->storeItems(cal, cal->items());
+    }
+    ui->logTextEdit->append("Attached local backend to " + activeCollection->name() + " at " + kalbPath);
+    updateCollectionInfo();
+}
+
+void MainWindow::updateCollectionInfo()
+{
+    if (!activeCollection) {
+        infoWidget->setCollection(nullptr);
+        return;
+    }
+
+    infoWidget->setCollection(activeCollection);
+    QTreeWidget *tree = infoWidget->findChild<QTreeWidget*>();
+    QTreeWidgetItem *backendsItem = tree->topLevelItem(0)->child(0); // "Backends"
+    backendsItem->takeChildren(); // Clear placeholder
+
+    const auto backends = collectionManager->backends()[activeCollection->id()];
+    for (SyncBackend *backend : backends) {
+        QTreeWidgetItem *backendItem = new QTreeWidgetItem(backendsItem);
+        if (LocalBackend *local = qobject_cast<LocalBackend*>(backend)) {
+            backendItem->setText(0, "Local");
+            backendItem->setText(1, local->rootPath());
+        } else if (CalDAVBackend *caldav = qobject_cast<CalDAVBackend*>(backend)) {
+            backendItem->setText(0, "CalDAV");
+            backendItem->setText(1, caldav->serverUrl());
+        }
+    }
 }
 
 void MainWindow::openLocal()
 {
-    ui->logTextEdit->append("Open triggered (stub)");
+    QString kalbPath = QFileDialog::getOpenFileName(this, "Open .kalb File", "", "*.kalb");
+    if (kalbPath.isEmpty()) return;
 
+    QString collectionId = QFileInfo(kalbPath).baseName();
+    QList<SyncBackend*> backends = collectionManager->loadBackendConfig(collectionId, kalbPath);
+    if (backends.isEmpty()) {
+        ui->logTextEdit->append("No valid backends found in " + kalbPath);
+        return;
+    }
+
+    collectionManager->setConfigBasePath(QFileInfo(kalbPath).absolutePath());
+    Collection *col = new Collection(collectionId, "Loaded Collection", this);
+    collectionManager->addCollection("Loaded Collection");
+    collectionManager->setBackends(collectionId, backends);
+
+    for (SyncBackend *backend : backends) {
+        if (LocalBackend *local = qobject_cast<LocalBackend*>(backend)) {
+            for (Cal *cal : activeCollection ? activeCollection->calendars() : QList<Cal*>()) {
+                QList<CalendarItem*> items = local->fetchItems(cal);
+                Cal *localCal = new Cal(cal->id(), cal->name(), col);
+                for (CalendarItem *item : items) {
+                    localCal->addItem(item);
+                }
+                col->addCal(localCal);
+            }
+        }
+    }
+
+    collectionManager->collectionAdded(col);
+    ui->logTextEdit->append("Opened " + kalbPath);
+    activeCollection = col;
+    updateCollectionInfo();
 }
 
 void MainWindow::addLocalCollection()
@@ -100,15 +171,31 @@ void MainWindow::createLocalFromRemote()
 
 void MainWindow::syncCollections()
 {
-    ui->logTextEdit->append("Sync Collections triggered (stub)");
-}
+    if (!activeCollection) {
+        ui->logTextEdit->append("No collection to sync!");
+        return;
+    }
 
+    const QString &collectionId = activeCollection->id();
+    QList<SyncBackend*> backends = collectionManager->backends()[collectionId];
+    for (SyncBackend *backend : backends) {
+        if (CalDAVBackend *caldav = qobject_cast<CalDAVBackend*>(backend)) {
+            qDebug() << "MainWindow: Triggering sync for CalDAV backend in" << collectionId;
+            connect(caldav, &CalDAVBackend::calendarsFetched, collectionManager, &CollectionManager::onCalendarsFetched);
+            connect(caldav, &CalDAVBackend::itemsFetched, collectionManager, &CollectionManager::onItemsFetched);
+            caldav->fetchCalendars(collectionId);
+            ui->logTextEdit->append("Syncing remote data for " + activeCollection->name());
+            return;
+        }
+    }
+    ui->logTextEdit->append("No remote backend to sync for " + activeCollection->name());
+}
 
 void MainWindow::onCollectionAdded(Collection *collection)
 {
     qDebug() << "MainWindow: onCollectionAdded for" << collection->id();
-    activeCollection = collection; // Set as active
-    infoWidget->setCollection(activeCollection); // Update display
+    activeCollection = collection;
+    updateCollectionInfo();
 
     const auto backends = collectionManager->backends();
     if (!backends.contains(collection->id())) {
@@ -119,16 +206,13 @@ void MainWindow::onCollectionAdded(Collection *collection)
     QSet<QString> fetchedCalendars;
     for (Cal *cal : collection->calendars()) {
         qDebug() << "MainWindow: Processing calendar" << cal->id() << cal->name();
-        if (fetchedCalendars.contains(cal->id())) {
-            qDebug() << "MainWindow: Skipping duplicate calendar" << cal->id();
-            continue;
-        }
+        if (fetchedCalendars.contains(cal->id())) continue;
         fetchedCalendars.insert(cal->id());
         addCalendarView(cal);
         for (SyncBackend *backend : backends[collection->id()]) {
             if (CalDAVBackend *caldav = qobject_cast<CalDAVBackend*>(backend)) {
                 qDebug() << "MainWindow: Triggering fetchItems for" << cal->id();
-                caldav->fetchItems(cal->id());
+                caldav->fetchItems(cal);
                 break;
             }
         }

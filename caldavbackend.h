@@ -17,9 +17,9 @@ public:
     explicit CalDAVBackend(const QString &serverUrl, const QString &username, const QString &password, QObject *parent = nullptr);
 
     QList<CalendarMetadata> fetchCalendars(const QString &collectionId) override;
-    QList<CalendarItem*> fetchItems(const QString &calId) override;
+    QList<CalendarItem*> fetchItems(Cal *cal) override;
     void storeCalendars(const QString &collectionId, const QList<Cal*> &calendars) override;
-    void storeItems(const QString &calId, const QList<CalendarItem*> &items) override;
+    void storeItems(Cal *cal, const QList<CalendarItem*> &items) override;
 
     QString serverUrl() const { return m_serverUrl; }
     QString username() const { return m_username; }
