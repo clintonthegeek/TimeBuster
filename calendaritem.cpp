@@ -56,3 +56,21 @@ QVariant Todo::data(int role) const
         return QVariant();
     }
 }
+
+CalendarItem* Event::clone(QObject *parent) const
+{
+    Event *newEvent = new Event(m_id, parent);
+    if (m_incidence) {
+        newEvent->setIncidence(KCalendarCore::Incidence::Ptr(m_incidence->clone())); // Wrap in QSharedPointer
+    }
+    return newEvent;
+}
+
+CalendarItem* Todo::clone(QObject *parent) const
+{
+    Todo *newTodo = new Todo(m_id, parent);
+    if (m_incidence) {
+        newTodo->setIncidence(KCalendarCore::Incidence::Ptr(m_incidence->clone())); // Wrap in QSharedPointer
+    }
+    return newTodo;
+}

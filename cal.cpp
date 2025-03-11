@@ -15,6 +15,7 @@ Cal::~Cal()
 void Cal::addItem(CalendarItem *item)
 {
     beginInsertRows(QModelIndex(), m_items.size(), m_items.size());
+    item->setParent(this); // Ensure Cal owns the item
     m_items.append(item);
     endInsertRows();
 }

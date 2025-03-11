@@ -68,6 +68,10 @@ void MainWindow::attachToLocal()
     collectionManager->addBackend(activeCollection->id(), localBackend);
     collectionManager->saveBackendConfig(activeCollection->id(), kalbPath);
 
+    // Store calendar metadata
+    localBackend->storeCalendars(activeCollection->id(), activeCollection->calendars());
+
+    // Store items
     for (Cal *cal : activeCollection->calendars()) {
         localBackend->storeItems(cal, cal->items());
     }

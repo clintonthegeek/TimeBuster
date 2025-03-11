@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 project(TimeBuster LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Sql)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOUIC ON)
@@ -29,12 +29,14 @@ qt_add_executable(TimeBuster
     configmanager.h configmanager.cpp
     credentialsdialog.h credentialsdialog.cpp
     collectioninfowidget.h collectioninfowidget.cpp
+    databasemanager.h databasemanager.cpp
 )
 
 target_link_libraries(TimeBuster
     PRIVATE
         Qt::Core
         Qt::Widgets
+        Qt::Sql
         KF6::CalendarCore
         KF6::DAV
         KF6::CoreAddons
