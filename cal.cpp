@@ -1,16 +1,22 @@
 #include "cal.h"
+#include "collection.h"
 
-Cal::Cal(const QString &id, const QString &displayName, QObject *parent)
-    : QAbstractTableModel(parent), m_id(id), m_displayName(displayName)
+Cal::Cal(const QString &id, const QString &name, Collection *parent)
+    : QAbstractTableModel(parent), m_id(id), m_name(name)
 {
-    // Stubbed dummy data
-    m_items.append(new Event("event1", this));
-    m_items.append(new Todo("todo1", this));
+        qDebug() << "Cal: Created with id" << m_id << "name" << m_name;
 }
 
 Cal::~Cal()
 {
-    qDeleteAll(m_items); // Clean up owned items
+    qDeleteAll(m_items);
+}
+
+void Cal::addItem(CalendarItem *item)
+{
+    beginInsertRows(QModelIndex(), m_items.size(), m_items.size());
+    m_items.append(item);
+    endInsertRows();
 }
 
 int Cal::rowCount(const QModelIndex &parent) const
@@ -22,39 +28,30 @@ int Cal::rowCount(const QModelIndex &parent) const
 int Cal::columnCount(const QModelIndex &parent) const
 {
     if (parent.isValid()) return 0;
-    return 2; // Stubbed: UID and Summary columns
+    return 4; // Type, Summary, Start, End/Due
 }
 
 QVariant Cal::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || role != Qt::DisplayRole)
-        return QVariant();
-
-    CalendarItem *item = m_items.at(index.row());
+    if (!index.isValid() || role != Qt::DisplayRole) return QVariant();
+    CalendarItem *item = m_items[index.row()];
     switch (index.column()) {
-    case 0: return item->uid();
-    case 1: return item->summary();
+    case 0: return item->type();
+    case 1: return item->data(Qt::DisplayRole); // Summary
+    case 2: return item->data(Qt::UserRole);    // Start
+    case 3: return item->data(Qt::UserRole + 1); // End or Due
     default: return QVariant();
     }
 }
 
 QVariant Cal::headerData(int section, Qt::Orientation orientation, int role) const
 {
-    if (role != Qt::DisplayRole || orientation != Qt::Horizontal)
-        return QVariant();
-
+    if (orientation != Qt::Horizontal || role != Qt::DisplayRole) return QVariant();
     switch (section) {
-    case 0: return "UID";
+    case 0: return "Type";
     case 1: return "Summary";
+    case 2: return "Start";
+    case 3: return "End/Due";
     default: return QVariant();
     }
-}
-
-void Cal::addItem(CalendarItem *item)
-{
-    beginInsertRows(QModelIndex(), m_items.size(), m_items.size());
-    m_items.append(item);
-    item->setParent(this); // Take ownership
-    endInsertRows();
-    emit itemsChanged();
 }

@@ -32,9 +32,17 @@ QVariant Collection::data(const QModelIndex &index, int role) const
     Cal *cal = m_calendars.at(index.row());
     switch (index.column()) {
     case 0: return cal->id();
-    case 1: return cal->displayName();
+    case 1: return cal->name(); //implement displayName() once thre!
     default: return QVariant();
     }
+}
+
+Cal* Collection::calendar(const QString &id) const
+{
+    for (Cal *cal : m_calendars) {
+        if (cal->id() == id) return cal;
+    }
+    return nullptr;
 }
 
 QVariant Collection::headerData(int section, Qt::Orientation orientation, int role) const

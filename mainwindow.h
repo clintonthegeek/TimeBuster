@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QMdiSubWindow>
 #include "credentialsdialog.h"
+#include "syncbackend.h"
 
 class CollectionManager; // Already there
 class Cal;

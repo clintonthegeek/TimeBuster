@@ -1,16 +1,58 @@
 #include "calendaritem.h"
+#include <KCalendarCore/Event>
+#include <KCalendarCore/Todo>
+#include <QDateTime>
 
-CalendarItem::CalendarItem(const QString &uid, QObject *parent)
-    : QObject(parent), m_uid(uid)
+CalendarItem::CalendarItem(const QString &id, QObject *parent)
+    : QObject(parent), m_id(id)
 {
 }
 
-Event::Event(const QString &uid, QObject *parent)
-    : CalendarItem(uid, parent), m_summary("Stub Event")
+void CalendarItem::setIncidence(const KCalendarCore::Incidence::Ptr &incidence)
+{
+    m_incidence = incidence;
+}
+
+Event::Event(const QString &id, QObject *parent)
+    : CalendarItem(id, parent)
 {
 }
 
-Todo::Todo(const QString &uid, QObject *parent)
-    : CalendarItem(uid, parent), m_summary("Stub Todo")
+QVariant Event::data(int role) const
 {
+    if (!m_incidence) return QVariant();
+    auto event = qSharedPointerCast<KCalendarCore::Event>(m_incidence);
+    switch (role) {
+    case Qt::DisplayRole:
+        return event->summary();
+    case Qt::UserRole:
+        return event->dtStart();
+    case Qt::UserRole + 1:
+        return event->dtEnd();
+    default:
+        return QVariant();
+    }
+}
+
+Todo::Todo(const QString &id, QObject *parent)
+    : CalendarItem(id, parent)
+{
+}
+
+QVariant Todo::data(int role) const
+{
+    if (!m_incidence) return QVariant();
+    auto todo = qSharedPointerCast<KCalendarCore::Todo>(m_incidence);
+    switch (role) {
+    case Qt::DisplayRole:
+        return todo->summary();
+    case Qt::UserRole:
+        return todo->dtStart(false); // Current occurrence
+    case Qt::UserRole + 1:
+        return todo->dtDue(false);
+    case Qt::UserRole + 2:
+        return todo->percentComplete();
+    default:
+        return QVariant();
+    }
 }

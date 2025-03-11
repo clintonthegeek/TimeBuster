@@ -23,6 +23,7 @@ public:
     QString name() const { return m_name; }
     void addCal(Cal *cal);
     QList<Cal*> calendars() const { return m_calendars; }
+    Cal* calendar(const QString &id) const; // New
 
 signals:
     void calendarsChanged();
