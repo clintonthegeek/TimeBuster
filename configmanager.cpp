@@ -66,3 +66,4 @@ QList<SyncBackend*> ConfigManager::loadBackendConfig(const QString &collectionId
     settings.endArray();
     return backends;
 }
+

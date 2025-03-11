@@ -1,6 +1,7 @@
 #include "localbackend.h"
 #include "cal.h"
 #include <KCalendarCore/ICalFormat>
+#include <KCalendarCore/MemoryCalendar> // Include for MemoryCalendar
 #include <QDir>
 #include <QFile>
 #include <QUrl>
@@ -13,10 +14,26 @@ LocalBackend::LocalBackend(const QString &rootPath, QObject *parent)
 
 QList<CalendarMetadata> LocalBackend::fetchCalendars(const QString &collectionId)
 {
-    // Stubbed - still fake for now
+    qDebug() << "LocalBackend: Fetching calendars for collection" << collectionId;
     QList<CalendarMetadata> calendars;
-    calendars.append(CalendarMetadata{ "cal1", "Local Calendar 1" });
-    m_idToPath["cal1"] = m_rootPath + "/cal1";
+
+    QDir rootDir(m_rootPath);
+    if (!rootDir.exists()) {
+        qDebug() << "LocalBackend: Root path" << m_rootPath << "does not exist";
+        emit dataFetched();
+        return calendars;
+    }
+
+    // Scan for subdirectories (e.g., "personal", "loganlist")
+    QStringList calDirs = rootDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const QString &calName : calDirs) {
+        // Use directory name as both ID and name for now - CalDAV ID might override later
+        QString calId = calName; // Temporary ID until synced with CalDAV
+        calendars.append(CalendarMetadata{ calId, calName });
+        m_idToPath[calId] = rootDir.filePath(calName);
+        qDebug() << "LocalBackend: Found calendar" << calName << "at" << m_idToPath[calId];
+    }
+
     emit dataFetched();
     return calendars;
 }
@@ -24,7 +41,7 @@ QList<CalendarMetadata> LocalBackend::fetchCalendars(const QString &collectionId
 void LocalBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
 {
     qDebug() << "LocalBackend: Storing" << items.size() << "items for" << cal->name();
-    QString calDirPath = QDir(m_rootPath).filePath(cal->name()); // e.g., /tmp/personal
+    QString calDirPath = QDir(m_rootPath).filePath(cal->name());
     QDir calDir(calDirPath);
     if (!calDir.exists()) {
         if (!calDir.mkpath(".")) {
@@ -48,7 +65,13 @@ void LocalBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
             continue;
         }
 
-        QString icalData = format.toString(item->incidence());
+        // Create a temporary MemoryCalendar to wrap the incidence
+        KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone("UTC")));
+        KCalendarCore::Incidence::Ptr incidence = item->incidence();
+        tempCalendar->addIncidence(incidence);
+
+        // Serialize the full calendar to get a proper VCALENDAR structure
+        QString icalData = format.toString(tempCalendar);
         if (file.write(icalData.toUtf8()) == -1) {
             qDebug() << "LocalBackend: Write failed for" << filePath << ":" << file.errorString();
             emit errorOccurred("Write failed: " + file.errorString());
@@ -60,7 +83,6 @@ void LocalBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
     }
     emit dataFetched();
 }
-
 
 
 void LocalBackend::storeCalendars(const QString &collectionId, const QList<Cal*> &calendars)
@@ -96,13 +118,17 @@ QList<CalendarItem*> LocalBackend::fetchItems(Cal *cal)
 
         QString icalData = QString::fromUtf8(file.readAll());
         file.close();
+
+        // Log raw data for debugging
+        qDebug() << "LocalBackend: Raw ICS data from" << filePath << ":\n" << icalData.left(200) + (icalData.length() > 200 ? "..." : "");
+
         auto incidence = format.fromString(icalData);
         if (!incidence) {
-            qDebug() << "LocalBackend: Failed to parse ICS data from" << filePath;
+            qDebug() << "LocalBackend: Failed to parse ICS data from" << filePath << "- Check format or encoding";
             continue;
         }
 
-        QString itemId = m_idToPath.key(filePath, filePath);
+        QString itemId = m_idToPath.key(filePath, filePath); // Fallback to file path if not mapped
         CalendarItem *item = nullptr;
         switch (incidence->type()) {
         case KCalendarCore::IncidenceBase::TypeEvent:

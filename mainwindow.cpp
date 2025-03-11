@@ -119,21 +119,31 @@ void MainWindow::openLocal()
 
     for (SyncBackend *backend : backends) {
         if (LocalBackend *local = qobject_cast<LocalBackend*>(backend)) {
-            for (Cal *cal : activeCollection ? activeCollection->calendars() : QList<Cal*>()) {
+            QList<CalendarMetadata> calendars = local->fetchCalendars(collectionId);
+            for (const CalendarMetadata &meta : calendars) {
+                Cal *cal = new Cal(meta.id, meta.name, col);
                 QList<CalendarItem*> items = local->fetchItems(cal);
-                Cal *localCal = new Cal(cal->id(), cal->name(), col);
                 for (CalendarItem *item : items) {
-                    localCal->addItem(item);
+                    cal->addItem(item);
                 }
-                col->addCal(localCal);
+                if (!items.isEmpty()) {
+                    col->addCal(cal);
+                } else {
+                    qDebug() << "MainWindow: No items loaded for calendar" << meta.name;
+                    delete cal; // Clean up if no items
+                }
             }
         }
     }
 
-    collectionManager->collectionAdded(col);
-    ui->logTextEdit->append("Opened " + kalbPath);
-    activeCollection = col;
-    updateCollectionInfo();
+    if (col->calendars().isEmpty()) {
+        ui->logTextEdit->append("No local calendars or items found in " + kalbPath);
+    } else {
+        collectionManager->collectionAdded(col);
+        ui->logTextEdit->append("Opened " + kalbPath + " with " + QString::number(col->calendars().size()) + " calendars");
+        activeCollection = col;
+        updateCollectionInfo();
+    }
 }
 
 void MainWindow::addLocalCollection()
