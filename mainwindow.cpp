@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "calendarview.h" // Added for CalendarView
+#include "collection.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), collectionManager(nullptr)
@@ -13,8 +14,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::createLocalFromRemote);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
 
-    Cal * aCal = new Cal("Hello", "hi there", this);
-    addCalendarView(aCal);
+    // In MainWindow constructor, after connect() calls
+    Collection *col = new Collection("col1", "Test Collection", this);
+    for (Cal *cal : col->calendars()) {
+        addCalendarView(cal);
+    }
 }
 
 MainWindow::~MainWindow()
