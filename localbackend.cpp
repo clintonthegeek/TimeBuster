@@ -133,7 +133,7 @@ void LocalBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
     KCalendarCore::ICalFormat format;
     for (const CalendarItem *item : items) {
         CalendarItem *clonedItem = CalendarItemFactory::createItem(item->id(), item->incidence(), nullptr);
-        if (clonedItem) {
+        if (!clonedItem) { // Fixed: Check for failure (nullptr)
             qDebug() << "LocalBackend: Failed to clone item" << item->id();
             continue;
         }
@@ -210,19 +210,13 @@ QList<CalendarItem*> LocalBackend::fetchItems(Cal *cal)
 
         KCalendarCore::Incidence::Ptr incidence = incidences.first();
         QString itemId = m_idToPath.key(filePath, filePath);
-        CalendarItem *item = nullptr;
-        switch (incidence->type()) {
-        case KCalendarCore::IncidenceBase::TypeEvent:
-            item = new Event(itemId, cal); // Parent to Cal, not LocalBackend
-            break;
-        case KCalendarCore::IncidenceBase::TypeTodo:
-            item = new Todo(itemId, cal);  // Parent to Cal, not LocalBackend
-            break;
-        default:
-            qDebug() << "LocalBackend: Unsupported incidence type in" << filePath;
+        // Use CalendarItemFactory to create items, parent to cal
+        CalendarItem *item = CalendarItemFactory::createItem(itemId, incidence, cal);
+        if (!item) {
+            qDebug() << "LocalBackend: Failed to create item from" << filePath;
             continue;
         }
-        item->setIncidence(incidence);
+
         items.append(item);
         qDebug() << "LocalBackend: Loaded" << item->type() << itemId << "from" << filePath;
         m_idToPath[itemId] = filePath;
