@@ -17,13 +17,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionAddRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
     connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::createLocalFromRemote);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
-    // Ensure single connection
-    if (!connect(collectionManager, &CollectionManager::collectionAdded, this, &MainWindow::onCollectionAdded)) {
-        qDebug() << "MainWindow: Failed to connect collectionAdded signal";
-    }
-    qDebug() << "MainWindow: Initialized";
-    // In constructor, add log feedback
+
     connect(collectionManager, &CollectionManager::collectionAdded, this, &MainWindow::onCollectionAdded);
+
+    qDebug() << "MainWindow: Initialized";
 
 }
 
