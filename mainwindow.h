@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QMdiSubWindow>
+#include "credentialsdialog.h"
 
 class CollectionManager; // Already there
 class Cal;
@@ -29,6 +30,7 @@ private slots:
 
 private:
     void addCalendarView(Cal *cal);
+    CredentialsDialog *credentialsDialog; // New - owned
 
     Ui::MainWindow *ui;
     CollectionManager *collectionManager; // Now fully used

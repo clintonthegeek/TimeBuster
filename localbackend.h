@@ -7,9 +7,11 @@
 class LocalBackend : public SyncBackend
 {
     Q_OBJECT
+    Q_PROPERTY(QString rootPath READ rootPath)
 
 public:
     explicit LocalBackend(const QString &rootPath, QObject *parent = nullptr);
+    QString rootPath() const { return m_rootPath; }
 
     QList<CalendarMetadata> fetchCalendars(const QString &collectionId) override;
     QList<CalendarItem*> fetchItems(const QString &calId) override;

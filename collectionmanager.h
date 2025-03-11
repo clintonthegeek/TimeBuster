@@ -5,7 +5,8 @@
 #include <QMap>
 #include "collection.h"
 
-class SyncBackend; // Forward declaration - stub for now
+class SyncBackend;
+class ConfigManager; // New
 
 class CollectionManager : public QObject
 {
@@ -24,9 +25,10 @@ signals:
     void syncFinished(const QString &collectionId, bool success);
 
 private:
-    QMap<QString, Collection*> m_collections; // Owned by CollectionManager
-    QMap<QString, QList<SyncBackend*>> m_collectionBackends; // Owned, stubbed for now
-    int m_collectionCounter; // For unique IDs
+    QMap<QString, Collection*> m_collections;
+    QMap<QString, QList<SyncBackend*>> m_collectionBackends;
+    ConfigManager *m_configManager; // New - owned
+    int m_collectionCounter;
 };
 
 #endif // COLLECTIONMANAGER_H

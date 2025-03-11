@@ -7,9 +7,15 @@
 class CalDAVBackend : public SyncBackend
 {
     Q_OBJECT
+    Q_PROPERTY(QString serverUrl READ serverUrl)
+    Q_PROPERTY(QString username READ username)
+    Q_PROPERTY(QString password READ password)
 
 public:
     explicit CalDAVBackend(const QString &serverUrl, const QString &username, const QString &password, QObject *parent = nullptr);
+    QString serverUrl() const { return m_serverUrl; }
+    QString username() const { return m_username; }
+    QString password() const { return m_password; }
 
     QList<CalendarMetadata> fetchCalendars(const QString &collectionId) override;
     QList<CalendarItem*> fetchItems(const QString &calId) override;

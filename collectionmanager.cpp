@@ -1,7 +1,8 @@
 #include "collectionmanager.h"
+#include "configmanager.h" // New
 
 CollectionManager::CollectionManager(QObject *parent)
-    : QObject(parent), m_collectionCounter(0)
+    : QObject(parent), m_collectionCounter(0), m_configManager(new ConfigManager(this))
 {
 }
 
@@ -11,6 +12,7 @@ CollectionManager::~CollectionManager()
     for (const QList<SyncBackend*> &backends : m_collectionBackends) {
         qDeleteAll(backends);
     }
+    // m_configManager deleted by Qt as a child
 }
 
 void CollectionManager::addCollection(const QString &name, SyncBackend *initialBackend)
@@ -21,8 +23,10 @@ void CollectionManager::addCollection(const QString &name, SyncBackend *initialB
 
     if (initialBackend) {
         m_collectionBackends[id] = { initialBackend };
+        QList<SyncBackend*> backends = { initialBackend };
+        m_configManager->saveBackendConfig(id, backends); // Save config
     } else {
-        m_collectionBackends[id] = {}; // Empty list for now
+        m_collectionBackends[id] = {};
     }
 
     emit collectionAdded(col);

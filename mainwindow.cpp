@@ -5,23 +5,19 @@
 #include "localbackend.h"
 #include "caldavbackend.h"
 
+
+// Update constructor
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow)
+    : QMainWindow(parent), ui(new Ui::MainWindow), credentialsDialog(new CredentialsDialog(this))
 {
     ui->setupUi(this);
+    collectionManager = new CollectionManager(this);
 
-    collectionManager = new CollectionManager(this); // Initialize it
-
-    // Connect menu actions to slots
     connect(ui->actionAddLocalCollection, &QAction::triggered, this, &MainWindow::addLocalCollection);
     connect(ui->actionAddRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
     connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::createLocalFromRemote);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
-
-    // Connect CollectionManager signal
     connect(collectionManager, &CollectionManager::collectionAdded, this, &MainWindow::onCollectionAdded);
-
-    // Remove your test code - handled by addLocalCollection now
 }
 
 MainWindow::~MainWindow()
@@ -48,11 +44,21 @@ void MainWindow::addLocalCollection()
     ui->logTextEdit->append("Added local collection with LocalBackend");
 }
 
+// Update addRemoteCollection
 void MainWindow::addRemoteCollection()
 {
-    CalDAVBackend *backend = new CalDAVBackend("http://fake.cal.dav", "user", "pass", this); // Fake creds
-    collectionManager->addCollection("Remote Collection", backend);
-    ui->logTextEdit->append("Added remote collection with CalDAVBackend");
+    if (credentialsDialog->exec() == QDialog::Accepted) {
+        CalDAVBackend *backend = new CalDAVBackend(
+            credentialsDialog->serverUrl(),
+            credentialsDialog->username(),
+            credentialsDialog->password(),
+            this
+            );
+        collectionManager->addCollection("Remote Collection", backend);
+        ui->logTextEdit->append("Added remote collection with CalDAVBackend");
+    } else {
+        ui->logTextEdit->append("Remote collection creation canceled");
+    }
 }
 
 void MainWindow::createLocalFromRemote()
