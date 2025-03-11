@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Calendar IDE</string>
+  </property>
+  <widget class="QMdiArea" name="mdiArea">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>20</y>
+     <width>800</width>
+     <height>540</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QDockWidget" name="logDock">
+   <property name="windowTitle">
+    <string>Log</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>8</number> <!-- BottomDockWidgetArea -->
+   </attribute>
+   <widget class="QTextEdit" name="logTextEdit"/>
+  </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>800</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="actionAddLocalCollection"/>
+    <addaction name="actionAddRemoteCollection"/>
+    <addaction name="actionCreateLocalFromRemote"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuSync">
+    <property name="title">
+     <string>&amp;Sync</string>
+    </property>
+    <addaction name="actionSyncCollections"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuSync"/>
+  </widget>
+  <action name="actionAddLocalCollection">
+   <property name="text">
+    <string>Add &amp;Local Collection</string>
+   </property>
+  </action>
+  <action name="actionAddRemoteCollection">
+   <property name="text">
+    <string>Add &amp;Remote Collection</string>
+   </property>
+  </action>
+  <action name="actionCreateLocalFromRemote">
+   <property name="text">
+    <string>&amp;Create Local from Remote</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>E&amp;xit</string>
+   </property>
+  </action>
+  <action name="actionSyncCollections">
+   <property name="text">
+    <string>&amp;Sync Collections</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>actionExit</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>close()</slot>
+  </connection>
+ </connections>
+</ui>
