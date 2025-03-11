@@ -13,22 +13,13 @@
   <property name="windowTitle">
    <string>Calendar IDE</string>
   </property>
-  <widget class="QMdiArea" name="mdiArea">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>20</y>
-     <width>800</width>
-     <height>540</height>
-    </rect>
-   </property>
-  </widget>
+  <widget class="QMdiArea" name="mdiArea"/>
   <widget class="QDockWidget" name="logDock">
    <property name="windowTitle">
     <string>Log</string>
    </property>
    <attribute name="dockWidgetArea">
-    <number>8</number> <!-- BottomDockWidgetArea -->
+    <number>8</number>
    </attribute>
    <widget class="QTextEdit" name="logTextEdit"/>
   </widget>
@@ -38,7 +29,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>20</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -48,6 +39,10 @@
     <addaction name="actionAddLocalCollection"/>
     <addaction name="actionAddRemoteCollection"/>
     <addaction name="actionCreateLocalFromRemote"/>
+    <addaction name="separator"/>
+    <addaction name="actionAttachToLocal"/>
+    <addaction name="separator"/>
+    <addaction name="actionOpenLocal"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -85,6 +80,16 @@
     <string>&amp;Sync Collections</string>
    </property>
   </action>
+  <action name="actionOpenLocal">
+   <property name="text">
+    <string>Open</string>
+   </property>
+  </action>
+  <action name="actionAttachToLocal">
+   <property name="text">
+    <string>Attach to Local</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections>
@@ -93,6 +98,16 @@
    <signal>triggered()</signal>
    <receiver>MainWindow</receiver>
    <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>20</x>
+     <y>20</y>
+    </hint>
+   </hints>
   </connection>
  </connections>
 </ui>

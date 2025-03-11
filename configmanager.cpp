@@ -9,33 +9,46 @@ ConfigManager::ConfigManager(QObject *parent)
 {
 }
 
-void ConfigManager::saveBackendConfig(const QString &collectionId, const QList<SyncBackend*> &backends)
+void ConfigManager::setBasePath(const QString &path)
 {
-    QSettings settings(configPath(collectionId), QSettings::IniFormat);
-    settings.clear();
+    m_basePath = path;
+}
 
+QString ConfigManager::configPath(const QString &collectionId, const QString &kalbPath) const
+{
+    if (!kalbPath.isEmpty()) {
+        return kalbPath; // Use provided path for Open/Attach
+    }
+    QDir dir(m_basePath.isEmpty() ? "configs" : m_basePath); // Fallback
+    if (!dir.exists()) dir.mkpath(".");
+    return dir.filePath(collectionId + ".kalb");
+}
+
+void ConfigManager::saveBackendConfig(const QString &collectionId, const QList<SyncBackend*> &backends, const QString &kalbPath)
+{
+    QSettings settings(configPath(collectionId, kalbPath), QSettings::IniFormat);
+    settings.clear();
     settings.beginWriteArray("backends");
     for (int i = 0; i < backends.size(); ++i) {
         settings.setArrayIndex(i);
         if (LocalBackend *local = dynamic_cast<LocalBackend*>(backends[i])) {
             settings.setValue("type", "local");
-            settings.setValue("rootPath", local->property("rootPath").toString());
+            settings.setValue("rootPath", local->rootPath());
         } else if (CalDAVBackend *caldav = dynamic_cast<CalDAVBackend*>(backends[i])) {
             settings.setValue("type", "caldav");
-            settings.setValue("serverUrl", caldav->property("serverUrl").toString());
-            settings.setValue("username", caldav->property("username").toString());
-            settings.setValue("password", caldav->property("password").toString());
+            settings.setValue("serverUrl", caldav->serverUrl());
+            settings.setValue("username", caldav->username());
+            settings.setValue("password", caldav->password());
         }
     }
     settings.endArray();
-    settings.sync(); // Stubbed - writes to a fake .kalb file
+    settings.sync();
 }
 
-QList<SyncBackend*> ConfigManager::loadBackendConfig(const QString &collectionId)
+QList<SyncBackend*> ConfigManager::loadBackendConfig(const QString &collectionId, const QString &kalbPath)
 {
     QList<SyncBackend*> backends;
-    QSettings settings(configPath(collectionId), QSettings::IniFormat);
-
+    QSettings settings(configPath(collectionId, kalbPath), QSettings::IniFormat);
     int size = settings.beginReadArray("backends");
     for (int i = 0; i < size; ++i) {
         settings.setArrayIndex(i);
@@ -51,13 +64,5 @@ QList<SyncBackend*> ConfigManager::loadBackendConfig(const QString &collectionId
         }
     }
     settings.endArray();
-
-    return backends; // Stubbed - returns fake data if no file
-}
-
-QString ConfigManager::configPath(const QString &collectionId) const
-{
-    QDir dir("configs"); // Stubbed - fake directory
-    if (!dir.exists()) dir.mkpath(".");
-    return dir.filePath(collectionId + ".kalb");
+    return backends;
 }

@@ -9,6 +9,7 @@
 class CollectionManager; // Already there
 class Cal;
 class Collection;
+class CollectionInfoWidget;
 
 namespace Ui {
 class MainWindow;
@@ -28,6 +29,8 @@ private slots:
     void createLocalFromRemote();
     void syncCollections();
     void onCollectionAdded(Collection *collection); // New slot
+    void attachToLocal();
+    void openLocal();
 
 private:
     void addCalendarView(Cal *cal);
@@ -35,6 +38,10 @@ private:
 
     Ui::MainWindow *ui;
     CollectionManager *collectionManager; // Now fully used
+
+    CollectionInfoWidget *infoWidget; // New
+    QDockWidget *infoDock; // New - keep the pointer
+    Collection *activeCollection; // New - track single active collection
 };
 
 #endif // MAINWINDOW_H

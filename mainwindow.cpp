@@ -4,12 +4,21 @@
 #include "collectionmanager.h" // Added
 #include "localbackend.h"
 #include "caldavbackend.h"
+#include "credentialsdialog.h"
+#include "collectioninfowidget.h"
+#include "QFileDialog"
+#include "QFileInfo"
+#include "QDockWidget"
+#include "QWidget"
 
 
 // Update constructor
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow), credentialsDialog(new CredentialsDialog(this))
+    : QMainWindow(parent), ui(new Ui::MainWindow), credentialsDialog(new CredentialsDialog(this)),
+    collectionManager(new CollectionManager(this)), infoWidget(new CollectionInfoWidget(this)),
+    infoDock(new QDockWidget("Collection Info", this)), activeCollection(nullptr)
 {
+
     ui->setupUi(this);
     collectionManager = new CollectionManager(this);
 
@@ -17,9 +26,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionAddRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
     connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::createLocalFromRemote);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
+    connect(ui->actionAttachToLocal, &QAction::triggered, this, &MainWindow::attachToLocal); // New
+    connect(ui->actionOpenLocal, &QAction::triggered, this, &MainWindow::openLocal); // New
 
     connect(collectionManager, &CollectionManager::collectionAdded, this, &MainWindow::onCollectionAdded);
 
+    infoDock->setWidget(infoWidget); // Set before adding
+    addDockWidget(Qt::LeftDockWidgetArea, infoDock); // Add to layout
     qDebug() << "MainWindow: Initialized";
 
 }
@@ -38,6 +51,18 @@ void MainWindow::addCalendarView(Cal *cal)
     ui->mdiArea->addSubWindow(subWindow);
     subWindow->resize(400, 300);
     subWindow->show();
+}
+
+void MainWindow::attachToLocal()
+{
+    ui->logTextEdit->append("Attach To Local triggered (stub)");
+
+}
+
+void MainWindow::openLocal()
+{
+    ui->logTextEdit->append("Open triggered (stub)");
+
 }
 
 void MainWindow::addLocalCollection()
@@ -82,6 +107,9 @@ void MainWindow::syncCollections()
 void MainWindow::onCollectionAdded(Collection *collection)
 {
     qDebug() << "MainWindow: onCollectionAdded for" << collection->id();
+    activeCollection = collection; // Set as active
+    infoWidget->setCollection(activeCollection); // Update display
+
     const auto backends = collectionManager->backends();
     if (!backends.contains(collection->id())) {
         qDebug() << "MainWindow: No backends for collection" << collection->id();

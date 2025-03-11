@@ -28,6 +28,7 @@ qt_add_executable(TimeBuster
     caldavbackend.h caldavbackend.cpp
     configmanager.h configmanager.cpp
     credentialsdialog.h credentialsdialog.cpp
+    collectioninfowidget.h collectioninfowidget.cpp
 )
 
 target_link_libraries(TimeBuster
