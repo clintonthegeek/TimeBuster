@@ -16,10 +16,14 @@ CalDAVBackend::CalDAVBackend(const QString &serverUrl, const QString &username, 
 
 CalDAVBackend::~CalDAVBackend()
 {
-    // No need to delete Cal* in m_calMap; they are owned by their parent (e.g., Collection)
+    // Cancel all active jobs to prevent them from running after destruction
+    for (KJob *job : m_activeJobs) {
+        job->kill(KJob::Quietly); // Quietly kill the job
+    }
+    m_activeJobs.clear();
     m_calMap.clear();
+    m_itemFetchQueue.clear();
 }
-
 QList<CalendarMetadata> CalDAVBackend::fetchCalendars(const QString &collectionId)
 {
     qDebug() << "CalDAVBackend: Starting fetchCalendars for collection" << collectionId;
@@ -90,9 +94,11 @@ void CalDAVBackend::processNextItemFetch()
     auto cache = std::make_shared<KDAV::EtagCache>(this);
     KDAV::DavItemsListJob *listJob = new KDAV::DavItemsListJob(davUrl, cache, this);
     listJob->setProperty("calId", calId);
+    m_activeJobs.append(listJob); // Track the job
 
-    connect(listJob, &KJob::finished, this, [listJob](KJob *j) {
+    connect(listJob, &KJob::finished, this, [this, listJob](KJob *j) {
         qDebug() << "CalDAVBackend: List job finished:" << j << "Error:" << j->error() << j->errorString();
+        m_activeJobs.removeOne(j); // Remove from active jobs
     });
 
     connect(listJob, &KDAV::DavItemsListJob::result, this, [this, calId, davUrl](KJob *job) {
@@ -101,7 +107,7 @@ void CalDAVBackend::processNextItemFetch()
             qDebug() << "CalDAVBackend: List error for" << calId << ":" << job->errorString();
             emit errorOccurred(job->errorString());
             m_itemFetchQueue.removeFirst();
-            removeCal(calId); // Clean up cal reference
+            removeCal(calId);
             processNextItemFetch();
             return;
         }
@@ -113,12 +119,11 @@ void CalDAVBackend::processNextItemFetch()
             emit itemsFetched(calId, QList<CalendarItem*>());
             emit dataFetched();
             m_itemFetchQueue.removeFirst();
-            removeCal(calId); // Clean up cal reference
+            removeCal(calId);
             processNextItemFetch();
             return;
         }
 
-        // Build URL list for MULTIGET
         QStringList urls;
         for (const KDAV::DavItem &item : items) {
             urls.append(item.url().toDisplayString());
@@ -126,6 +131,8 @@ void CalDAVBackend::processNextItemFetch()
         qDebug() << "CalDAVBackend: Preparing MULTIGET for" << urls.size() << "items";
 
         KDAV::DavItemsFetchJob *fetchJob = new KDAV::DavItemsFetchJob(davUrl, urls, this);
+        m_activeJobs.append(fetchJob); // Track the job
+
         connect(fetchJob, &KDAV::DavItemsFetchJob::result, this, [this, calId](KJob *job) {
             if (job->error()) {
                 qDebug() << "CalDAVBackend: MULTIGET error for" << calId << ":" << job->errorString();
@@ -137,7 +144,7 @@ void CalDAVBackend::processNextItemFetch()
 
                 QList<CalendarItem*> result;
                 KCalendarCore::ICalFormat format;
-                Cal *cal = getCal(calId); // Retrieve cal from map
+                Cal *cal = getCal(calId);
                 if (!cal) {
                     qDebug() << "CalDAVBackend: No Cal found for" << calId;
                     return;
@@ -156,11 +163,10 @@ void CalDAVBackend::processNextItemFetch()
                         continue;
                     }
 
-                    // Use CalendarItemFactory to create items, parent to cal
                     CalendarItem *calItem = CalendarItemFactory::createItem(item.url().toDisplayString(), incidence, cal);
                     if (calItem) {
                         result.append(calItem);
-                        cal->addItem(calItem); // Ensure cal owns the item
+                        cal->addItem(calItem);
                         qDebug() << "CalDAVBackend: Added" << calItem->type() << calItem->id();
                     }
                 }
@@ -169,8 +175,12 @@ void CalDAVBackend::processNextItemFetch()
                 emit dataFetched();
             }
             m_itemFetchQueue.removeFirst();
-            removeCal(calId); // Clean up cal reference
+            removeCal(calId);
             processNextItemFetch();
+        });
+
+        connect(fetchJob, &KJob::finished, this, [this, fetchJob](KJob *j) {
+            m_activeJobs.removeOne(j); // Remove from active jobs
         });
 
         qDebug() << "CalDAVBackend: Starting MULTIGET job for" << calId;
@@ -253,6 +263,7 @@ QList<CalendarItem*> CalDAVBackend::fetchItems(Cal *cal)
     if (m_itemFetchQueue.size() == 1) {
         processNextItemFetch(); // Start if queue was empty
     }
+    // Return an empty list for now; items will be added asynchronously
     return QList<CalendarItem*>();
 }
 

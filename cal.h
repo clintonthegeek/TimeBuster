@@ -21,6 +21,8 @@ public:
     QString name() const { return m_name; }
     void addItem(CalendarItem *item);
     QList<CalendarItem*> items() const { return m_items; }
+    bool updateItem(int row, const QString &summary); // New method to edit an item
+    void refreshModel(); // New method to refresh the model
 
     // QAbstractTableModel
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;

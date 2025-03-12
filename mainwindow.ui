@@ -36,6 +36,8 @@
     <property name="title">
      <string>&amp;File</string>
     </property>
+    <addaction name="actionEditItem"/>
+    <addaction name="separator"/>
     <addaction name="actionAddLocalCollection"/>
     <addaction name="actionAddRemoteCollection"/>
     <addaction name="actionCreateLocalFromRemote"/>
@@ -88,6 +90,11 @@
   <action name="actionAttachToLocal">
    <property name="text">
     <string>Attach to Local</string>
+   </property>
+  </action>
+  <action name="actionEditItem">
+   <property name="text">
+    <string>&amp;Edit Item</string>
    </property>
   </action>
  </widget>

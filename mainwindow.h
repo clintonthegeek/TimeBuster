@@ -5,8 +5,9 @@
 #include <QMdiSubWindow>
 #include "credentialsdialog.h"
 #include "syncbackend.h"
+#include "sessionmanager.h" // For SessionManager
 
-class CollectionManager; // Already there
+class CollectionManager;
 class Cal;
 class Collection;
 class CollectionInfoWidget;
@@ -28,21 +29,27 @@ private slots:
     void addRemoteCollection();
     void createLocalFromRemote();
     void syncCollections();
-    void onCollectionAdded(Collection *collection); // New slot
+    void onCollectionAdded(Collection *collection);
     void attachToLocal();
     void openLocal();
+    void onEditItem();
+    void onChangesApplied();
 
 private:
     void addCalendarView(Cal *cal);
-    void updateCollectionInfo(); // Added
-    CredentialsDialog *credentialsDialog; // New - owned
+    void updateCollectionInfo();
+    void initializeSessionManager();
+    CredentialsDialog *credentialsDialog;
 
     Ui::MainWindow *ui;
-    CollectionManager *collectionManager; // Now fully used
+    CollectionManager *collectionManager;
 
-    CollectionInfoWidget *infoWidget; // New
-    QDockWidget *infoDock; // New - keep the pointer
-    Collection *activeCollection; // New - track single active collection
+    CollectionInfoWidget *infoWidget;
+    QDockWidget *infoDock;
+
+    Collection *activeCollection;
+    Cal *activeCal; // New member for tracking active calendar
+    SessionManager *sessionManager; // Persistent SessionManager
 };
 
 #endif // MAINWINDOW_H

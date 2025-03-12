@@ -3,33 +3,49 @@
 
 #include <QObject>
 #include <QList>
-#include <QVariant>
-#include "syncbackend.h"
+#include <QDateTime>
+#include <QString>
+#include "collectionmanager.h"
 
 struct Change {
     QString calId;
     QString itemId;
-    QString operation;
-    QVariant data;
+    QString operation; // e.g., "UPDATE", "DELETE"
+    QString data;      // iCal string or serialized data
     QDateTime timestamp;
 };
+
+class SyncBackend;
 
 class SessionManager : public QObject
 {
     Q_OBJECT
+
 public:
-    explicit SessionManager(const QString &kalbPath, QObject *parent = nullptr);
+    explicit SessionManager(const QString &kalbFilePath, QObject *parent = nullptr);
     ~SessionManager();
+    void setCollectionManager(CollectionManager *cm) { m_collectionManager = cm; }
 
     void stageChange(const Change &change);
     void saveCache();
     void loadCache();
-    void applyToBackend(SyncBackend *backend);
     void clearCache();
+    void applyToBackend(SyncBackend *backend);
+    int changesCount() const { return m_changes.size(); }
+
+
+
+    // Set the .kalb file path to determine the delta file location
+    void setKalbFilePath(const QString &kalbFilePath);
+
+signals:
+    void changesApplied(); // Signal to notify UI of applied changes
 
 private:
-    QString m_kalbPath;
+    QString m_kalbFilePath;
+    QString m_deltaFilePath;
     QList<Change> m_changes;
+    CollectionManager *m_collectionManager = nullptr;
 };
 
 #endif // SESSIONMANAGER_H

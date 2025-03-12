@@ -1,17 +1,20 @@
 #include "sessionmanager.h"
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDebug>
 #include "cal.h"
 #include "calendaritemfactory.h"
+#include "localbackend.h" // Add this to declare LocalBackend
 #include <KCalendarCore/ICalFormat>
+#include <KCalendarCore/MemoryCalendar>
 
-SessionManager::SessionManager(const QString &kalbPath, QObject *parent)
-    : QObject(parent), m_kalbPath(kalbPath)
+SessionManager::SessionManager(const QString &kalbFilePath, QObject *parent)
+    : QObject(parent), m_kalbFilePath(kalbFilePath)
 {
-    loadCache();
+    setKalbFilePath(kalbFilePath); // Initialize delta path
 }
 
 SessionManager::~SessionManager()
@@ -19,11 +22,20 @@ SessionManager::~SessionManager()
     saveCache();
 }
 
+void SessionManager::setKalbFilePath(const QString &kalbFilePath)
+{
+    m_kalbFilePath = kalbFilePath;
+    m_deltaFilePath = QFileInfo(m_kalbFilePath).absolutePath() + "/.kalb.delta";
+    qDebug() << "SessionManager: Set delta path to" << m_deltaFilePath;
+}
+
 void SessionManager::stageChange(const Change &change)
 {
     m_changes.append(change);
+    saveCache(); // Save immediately for now
 }
 
+/*
 void SessionManager::saveCache()
 {
     if (m_changes.isEmpty()) return;
@@ -48,8 +60,27 @@ void SessionManager::saveCache()
     QJsonDocument doc(jsonArray);
     file.write(doc.toJson());
     file.close();
+}*/
+void SessionManager::saveCache()
+{
+    QFile file(m_deltaFilePath);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&file);
+        for (const Change &change : m_changes) {
+            out << "calId:" << change.calId << "\n"
+                << "itemId:" << change.itemId << "\n"
+                << "operation:" << change.operation << "\n"
+                << "data:" << change.data << "\n"
+                << "timestamp:" << change.timestamp.toString() << "\n"
+                << "---\n";
+        }
+        file.close();
+    } else {
+        qDebug() << "SessionManager: Failed to save cache to" << m_deltaFilePath;
+    }
 }
 
+/*
 void SessionManager::loadCache()
 {
     QFile file(m_kalbPath + ".delta");
@@ -72,8 +103,39 @@ void SessionManager::loadCache()
         change.timestamp = QDateTime::fromString(obj["timestamp"].toString(), Qt::ISODate);
         m_changes.append(change);
     }
+}*/
+
+void SessionManager::loadCache()
+{
+    m_changes.clear();
+    QFile file(m_deltaFilePath);
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTextStream in(&file);
+        Change change;
+        while (!in.atEnd()) {
+            QString line = in.readLine().trimmed();
+            if (line == "---") {
+                if (!change.calId.isEmpty()) {
+                    m_changes.append(change);
+                    change = Change(); // Reset for next change
+                }
+                continue;
+            }
+            if (line.startsWith("calId:")) change.calId = line.mid(6);
+            else if (line.startsWith("itemId:")) change.itemId = line.mid(7);
+            else if (line.startsWith("operation:")) change.operation = line.mid(10);
+            else if (line.startsWith("data:")) change.data = line.mid(5);
+            else if (line.startsWith("timestamp:")) change.timestamp = QDateTime::fromString(line.mid(10));
+        }
+        if (!change.calId.isEmpty()) m_changes.append(change); // Append the last change
+        file.close();
+        qDebug() << "SessionManager: Loaded" << m_changes.size() << "changes";
+    } else {
+        qDebug() << "SessionManager: No cache file found at" << m_deltaFilePath;
+    }
 }
 
+/*
 void SessionManager::applyToBackend(SyncBackend *backend)
 {
     for (const Change &change : m_changes) {
@@ -109,10 +171,66 @@ void SessionManager::applyToBackend(SyncBackend *backend)
         }
     }
     clearCache();
+}*/
+
+void SessionManager::applyToBackend(SyncBackend *backend)
+{
+    if (LocalBackend *local = qobject_cast<LocalBackend*>(backend)) {
+        for (const Change &change : m_changes) {
+            if (change.operation == "UPDATE") {
+                // Update the item in the backend
+                local->updateItem(change.calId, change.itemId, change.data);
+
+                // Find the corresponding Cal and update the in-memory item
+                if (m_collectionManager) {
+                    bool calFound = false;
+                    for (Collection *col : m_collectionManager->getCollections()) {
+                            Cal *cal = col->calendar(change.calId);
+                            if (!cal) {
+                                qDebug() << "SessionManager: Cal" << change.calId << "no longer exists";
+                                continue;
+                            }
+                            calFound = true;
+                            for (int i = 0; i < cal->items().size(); ++i) {
+                                CalendarItem *item = cal->items().at(i);
+                                if (!item) {
+                                    qDebug() << "SessionManager: Invalid item at index" << i;
+                                    continue;
+                                }
+                                if (item->id() == change.itemId) {
+                                    KCalendarCore::ICalFormat format;
+                                    KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone("UTC")));
+                                    if (format.fromString(tempCalendar, change.data)) {
+                                        KCalendarCore::Incidence::List incidences = tempCalendar->incidences();
+                                        if (!incidences.isEmpty()) {
+                                            item->setIncidence(incidences.first());
+                                            emit cal->dataChanged(cal->index(i, 0), cal->index(i, cal->columnCount() - 1));
+                                            qDebug() << "SessionManager: Updated in-memory item" << change.itemId;
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                            break;
+
+                    }
+                    if (!calFound) {
+                        qDebug() << "SessionManager: Calendar" << change.calId << "not found in any collection";
+                    }
+                } else {
+                    qDebug() << "SessionManager: No CollectionManager available";
+                }
+            } else {
+                qDebug() << "SessionManager: Operation" << change.operation << "not yet supported";
+            }
+        }
+        clearCache();
+        emit changesApplied();
+    }
 }
 
 void SessionManager::clearCache()
 {
-    QFile::remove(m_kalbPath + ".delta");
+    QFile::remove(m_deltaFilePath); // Use m_deltaFilePath instead of m_kalbPath + ".delta"
     m_changes.clear();
 }

@@ -117,6 +117,36 @@ void LocalBackend::storeCalendars(const QString &collectionId, const QList<Cal*>
     emit dataFetched();
 }
 
+void LocalBackend::updateItem(const QString &calId, const QString &itemId, const QString &icalData)
+{
+    qDebug() << "LocalBackend: Updating item" << itemId << "for calendar" << calId;
+
+    // Find the file path for the item
+    QString filePath = m_idToPath.value(itemId);
+    if (filePath.isEmpty()) {
+        qDebug() << "LocalBackend: No file path found for item" << itemId;
+        emit errorOccurred("No file path found for item: " + itemId);
+        return;
+    }
+
+    // Write the updated iCal data to the file
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qDebug() << "LocalBackend: Failed to open" << filePath << ":" << file.errorString();
+        emit errorOccurred("Failed to write item: " + file.errorString());
+        return;
+    }
+
+    if (file.write(icalData.toUtf8()) == -1) {
+        qDebug() << "LocalBackend: Write failed for" << filePath << ":" << file.errorString();
+        emit errorOccurred("Write failed: " + file.errorString());
+    } else {
+        qDebug() << "LocalBackend: Updated item" << itemId << "at" << filePath;
+    }
+    file.close();
+    emit dataFetched();
+}
+
 void LocalBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
 {
     qDebug() << "LocalBackend: Storing" << items.size() << "items for" << cal->name();

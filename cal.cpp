@@ -14,10 +14,40 @@ Cal::~Cal()
 
 void Cal::addItem(CalendarItem *item)
 {
+    if (!item || m_items.contains(item)) {
+        qDebug() << "Cal: Item already exists or is null, skipping addition. Please diagnose and fix!";
+        return;
+    }
     beginInsertRows(QModelIndex(), m_items.size(), m_items.size());
     item->setParent(this); // Ensure Cal owns the item
     m_items.append(item);
     endInsertRows();
+}
+
+void Cal::refreshModel()
+{
+    beginResetModel();
+    endResetModel();
+}
+
+bool Cal::updateItem(int row, const QString &summary)
+{
+    if (row < 0 || row >= m_items.size()) {
+        qDebug() << "Cal: Invalid row" << row << "for update";
+        return false;
+    }
+
+    CalendarItem *item = m_items[row];
+    KCalendarCore::Incidence::Ptr incidence = item->incidence();
+    if (incidence) {
+        incidence->setSummary(summary); // Update the incidence
+        QModelIndex topLeft = index(row, 1); // Column 1 is Summary
+        emit dataChanged(topLeft, topLeft);
+        qDebug() << "Cal: Updated item" << item->id() << "with summary" << summary;
+        return true;
+    }
+    qDebug() << "Cal: No incidence for item" << item->id();
+    return false;
 }
 
 int Cal::rowCount(const QModelIndex &parent) const

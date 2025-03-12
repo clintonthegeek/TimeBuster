@@ -11,6 +11,10 @@ CalendarView::CalendarView(Cal *cal, QWidget *parent)
     layout->addWidget(tableView);
     setLayout(layout);
 
+    // Connect selection changes to emit our signal
+    connect(tableView->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, &CalendarView::selectionChanged);
+
     // Basic sizing - adjustable later
     resize(400, 300);
 }
@@ -19,4 +23,11 @@ CalendarView::~CalendarView()
 {
     // tableView is a child, deleted by Qt
     // calModel is not owned, no delete here
+}
+
+void CalendarView::refresh()
+{
+    tableView->setModel(nullptr); // Detach model
+    tableView->setModel(calModel); // Reattach to force refresh
+    qDebug() << "CalendarView: Refreshed view for" << calModel->name();
 }

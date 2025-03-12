@@ -6,7 +6,7 @@
 #include "collection.h"
 
 class SyncBackend;
-class ConfigManager; // New
+class ConfigManager;
 class CalendarMetadata;
 
 class CollectionManager : public QObject
@@ -18,18 +18,22 @@ public:
     ~CollectionManager() override;
 
     void addCollection(const QString &name, SyncBackend *initialBackend = nullptr);
-    void addBackend(const QString &collectionId, SyncBackend *backend); // New
-    void saveBackendConfig(const QString &collectionId, const QString &kalbPath = QString()); // New
-    QList<SyncBackend*> loadBackendConfig(const QString &collectionId, const QString &kalbPath = QString()); // New
-    void setConfigBasePath(const QString &path); // New
+    void addBackend(const QString &collectionId, SyncBackend *backend);
+    void saveBackendConfig(const QString &collectionId, const QString &kalbPath = QString());
+    QList<SyncBackend*> loadBackendConfig(const QString &collectionId, const QString &kalbPath = QString());
+    void setConfigBasePath(const QString &path);
     Collection* collection(const QString &id) const;
 
     QMap<QString, QList<SyncBackend*>> backends() const { return m_collectionBackends; }
-    void setBackends(const QString &collectionId, const QList<SyncBackend*> &backends); // New
+    void setBackends(const QString &collectionId, const QList<SyncBackend*> &backends);
+
+    // New method to access collections
+    QList<Collection*> getCollections() const {
+        return m_collections.values();
+    }
 
     void onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars);
     void onItemsFetched(const QString &calId, const QList<CalendarItem*> &items);
-
 
 signals:
     void collectionAdded(Collection *collection);
@@ -42,6 +46,5 @@ private:
     ConfigManager *m_configManager;
     int m_collectionCounter;
 };
-
 
 #endif // COLLECTIONMANAGER_H

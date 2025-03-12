@@ -20,10 +20,11 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
     QString id() const { return m_id; }
+    void setId(const QString &id) { m_id = id; } // New setter
     QString name() const { return m_name; }
     void addCal(Cal *cal);
     QList<Cal*> calendars() const { return m_calendars; }
-    Cal* calendar(const QString &id) const; // New
+    Cal* calendar(const QString &id) const;
 
 signals:
     void calendarsChanged();

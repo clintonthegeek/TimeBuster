@@ -65,21 +65,22 @@ void CollectionManager::saveBackendConfig(const QString &collectionId, const QSt
 
 void CollectionManager::onItemsFetched(const QString &calId, const QList<CalendarItem*> &items)
 {
-    qDebug() << "CollectionManager: onItemsFetched for" << calId << "with" << items.size() << "items";
-    for (Collection *col : m_collections) {
-        if (Cal *cal = col->calendar(calId)) {
-            for (CalendarItem *item : items) {
-                cal->addItem(item);
-            }
-            qDebug() << "CollectionManager: Updated Cal" << calId << "with" << items.size() << "items";
-            emit dataFetched(col);
-            return;
+    if (m_collections.isEmpty()) {
+        qDebug() << "CollectionManager: No collections available";
+        return;
+    }
+
+    for (auto it = m_collections.constBegin(); it != m_collections.constEnd(); ++it) {
+        Collection *col = it.value();
+        Cal *cal = col->calendar(calId); // Look up the Cal by ID
+        if (cal) { // If found, the calendar exists in this collection
+            qDebug() << "CollectionManager: Received" << items.size() << "items for Cal" << calId;
+            cal->refreshModel(); // Notify views to update
+            emit dataFetched(col); // Notify MainWindow or other listeners
+            break;
         }
     }
-    qDebug() << "CollectionManager: No calendar found for" << calId;
-    qDeleteAll(items); // Clean up if no match
 }
-
 void CollectionManager::onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars)
 {
     qDebug() << "CollectionManager: onCalendarsFetched for" << collectionId << "with" << calendars.size() << "calendars";

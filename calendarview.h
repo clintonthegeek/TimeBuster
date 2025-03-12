@@ -13,6 +13,13 @@ public:
     explicit CalendarView(Cal *cal, QWidget *parent = nullptr);
     ~CalendarView() override;
 
+    Cal *model() const { return calModel; }
+    QModelIndex currentIndex() const { return tableView->currentIndex(); }
+    void refresh(); // New method to refresh the view
+
+signals:
+    void selectionChanged(); // New signal for when selection changes
+
 private:
     QTableView *tableView;
     Cal *calModel; // Not owned - MainWindow or CollectionManager owns it

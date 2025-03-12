@@ -49,6 +49,7 @@ private:
     Cal* getCal(const QString &calId) const { return m_calMap.value(calId); }
     void setCal(const QString &calId, Cal *cal) { m_calMap.insert(calId, cal); }
     void removeCal(const QString &calId) { m_calMap.remove(calId); }
+    QList<KJob*> m_activeJobs; // Track active jobs
 };
 
 #endif // CALDAVBACKEND_H
