@@ -28,6 +28,7 @@ void Cal::refreshModel()
 {
     beginResetModel();
     endResetModel();
+    qDebug() << "Cal: Model refreshed for" << m_name;
 }
 
 bool Cal::updateItem(int row, const QString &summary)

@@ -34,6 +34,7 @@ private slots:
     void openLocal();
     void onEditItem();
     void onChangesApplied();
+    void onSaveChanges(); // New slot for committing changes
 
 private:
     void addCalendarView(Cal *cal);

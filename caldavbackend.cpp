@@ -6,6 +6,7 @@
 #include <KCalendarCore/ICalFormat>
 #include <QUrl>
 #include <QDebug>
+#include <QRegularExpression>
 #include "cal.h"
 #include "calendaritemfactory.h"
 
@@ -24,6 +25,7 @@ CalDAVBackend::~CalDAVBackend()
     m_calMap.clear();
     m_itemFetchQueue.clear();
 }
+
 QList<CalendarMetadata> CalDAVBackend::fetchCalendars(const QString &collectionId)
 {
     qDebug() << "CalDAVBackend: Starting fetchCalendars for collection" << collectionId;
@@ -55,6 +57,7 @@ void CalDAVBackend::onCollectionsFetched(KJob *job)
     KDAV::DavCollectionsFetchJob *fetchJob = qobject_cast<KDAV::DavCollectionsFetchJob*>(job);
     KDAV::DavCollection::List collections = fetchJob->collections();
     QList<CalendarMetadata> calendars;
+    QString collectionId = fetchJob->property("collectionId").toString();
 
     qDebug() << "CalDAVBackend: Found" << collections.size() << "collections";
     for (const KDAV::DavCollection &col : collections) {
@@ -62,16 +65,18 @@ void CalDAVBackend::onCollectionsFetched(KJob *job)
         << "Name:" << col.displayName()
         << "ContentTypes:" << col.contentTypes();
         if (col.contentTypes() & (KDAV::DavCollection::Events | KDAV::DavCollection::Todos | KDAV::DavCollection::Calendar)) {
+            QString calName = col.displayName().isEmpty() ? col.url().toDisplayString() : col.displayName();
+            // Generate stable calId: collectionId + simplified name
+            QString simplifiedName = calName.toLower().replace(QRegularExpression("[^a-z0-9]"), "_");
+            QString calId = QString("%1_%2").arg(collectionId).arg(simplifiedName);
             CalendarMetadata meta;
-            meta.id = col.url().url().toString();
-            meta.name = col.displayName().isEmpty() ? col.url().toDisplayString() : col.displayName();
+            meta.id = calId;
+            meta.name = calName;
             calendars.append(meta);
-            m_idToUrl[meta.id] = col.url().toDisplayString();
-            qDebug() << "CalDAVBackend: Added calendar" << meta.id << meta.name;
+            m_idToUrl[calId] = col.url().toDisplayString();
         }
     }
 
-    QString collectionId = fetchJob->property("collectionId").toString();
     qDebug() << "CalDAVBackend: Emitting calendarsFetched for" << collectionId << "with" << calendars.size() << "calendars";
     emit calendarsFetched(collectionId, calendars);
     emit dataFetched();
@@ -162,8 +167,9 @@ void CalDAVBackend::processNextItemFetch()
                         qDebug() << "CalDAVBackend: Failed to parse item" << item.url().toDisplayString();
                         continue;
                     }
-
-                    CalendarItem *calItem = CalendarItemFactory::createItem(item.url().toDisplayString(), incidence, cal);
+                    QString itemIdBase = incidence->uid().isEmpty() ? QString::number(qHash(item.url().toDisplayString())) : incidence->uid();
+                    QString itemId = QString("%1_%2").arg(calId).arg(itemIdBase);
+                    CalendarItem *calItem = CalendarItemFactory::createItem(itemId, incidence, cal);
                     if (calItem) {
                         result.append(calItem);
                         cal->addItem(calItem);
@@ -249,21 +255,22 @@ void CalDAVBackend::fetchItemData(const QString &calId, const KDAV::DavItem::Lis
     fetchJob->start();
 }
 
+
 QList<CalendarItem*> CalDAVBackend::fetchItems(Cal *cal)
 {
-    qDebug() << "CalDAVBackend: Queuing fetchItems for" << cal->id();
-    if (!m_idToUrl.contains(cal->id())) {
-        qDebug() << "CalDAVBackend: Unknown calId" << cal->id();
+    QString calId = cal->id();
+    qDebug() << "CalDAVBackend: Queuing fetchItems for" << calId;
+    if (!m_idToUrl.contains(calId)) {
+        qDebug() << "CalDAVBackend: Unknown calId" << calId;
         emit dataFetched();
         return QList<CalendarItem*>();
     }
 
-    m_itemFetchQueue.append(cal->id());
-    setCal(cal->id(), cal); // Store cal reference with calId
+    m_calMap[calId] = cal;
+    m_itemFetchQueue.append(calId);
     if (m_itemFetchQueue.size() == 1) {
-        processNextItemFetch(); // Start if queue was empty
+        processNextItemFetch();
     }
-    // Return an empty list for now; items will be added asynchronously
     return QList<CalendarItem*>();
 }
 

@@ -239,7 +239,8 @@ QList<CalendarItem*> LocalBackend::fetchItems(Cal *cal)
         }
 
         KCalendarCore::Incidence::Ptr incidence = incidences.first();
-        QString itemId = m_idToPath.key(filePath, filePath);
+        QString itemIdBase = incidence->uid().isEmpty() ? QString::number(qHash(filePath)) : incidence->uid();
+        QString itemId = QString("%1_%2").arg(cal->id()).arg(itemIdBase);
         // Use CalendarItemFactory to create items, parent to cal
         CalendarItem *item = CalendarItemFactory::createItem(itemId, incidence, cal);
         if (!item) {

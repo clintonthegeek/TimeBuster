@@ -30,6 +30,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionAttachToLocal, &QAction::triggered, this, &MainWindow::attachToLocal);
     connect(ui->actionOpenLocal, &QAction::triggered, this, &MainWindow::openLocal);
     connect(ui->actionEditItem, &QAction::triggered, this, &MainWindow::onEditItem);
+    connect(ui->actionSaveChanges, &QAction::triggered, this, &MainWindow::onSaveChanges);
 
     connect(collectionManager, &CollectionManager::collectionAdded, this, &MainWindow::onCollectionAdded);
 
@@ -73,6 +74,22 @@ void MainWindow::addCalendarView(Cal *cal)
     ui->mdiArea->addSubWindow(subWindow);
     subWindow->resize(400, 300);
     subWindow->show();
+}
+
+void MainWindow::onSaveChanges()
+{
+    if (!activeCollection || !sessionManager) {
+        ui->logTextEdit->append("No active collection or session manager!");
+        return;
+    }
+
+    for (SyncBackend *backend : collectionManager->backends()[activeCollection->id()]) {
+        if (LocalBackend *local = qobject_cast<LocalBackend*>(backend)) {
+            sessionManager->commitChanges(local);
+            ui->logTextEdit->append("Changes committed to local storage.");
+            break;
+        }
+    }
 }
 
 void MainWindow::initializeSessionManager()

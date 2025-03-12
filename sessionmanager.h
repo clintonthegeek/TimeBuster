@@ -31,6 +31,7 @@ public:
     void loadCache();
     void clearCache();
     void applyToBackend(SyncBackend *backend);
+    void commitChanges(SyncBackend *backend); // Commits changes to backend
     int changesCount() const { return m_changes.size(); }
 
 

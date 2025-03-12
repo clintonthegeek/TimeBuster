@@ -175,57 +175,55 @@ void SessionManager::applyToBackend(SyncBackend *backend)
 
 void SessionManager::applyToBackend(SyncBackend *backend)
 {
+    Q_UNUSED(backend); // Not used for storage
+    if (!m_collectionManager) {
+        qDebug() << "SessionManager: No CollectionManager available";
+        return;
+    }
+
+    for (const Change &change : m_changes) {
+        if (change.operation == "UPDATE") {
+            bool calFound = false;
+            for (Collection *col : m_collectionManager->getCollections()) {
+                Cal *cal = col->calendar(change.calId);
+                if (!cal) continue;
+                calFound = true;
+                for (int i = 0; i < cal->items().size(); ++i) {
+                    CalendarItem *item = cal->items().at(i);
+                    if (item->id() == change.itemId) {
+                        KCalendarCore::ICalFormat format;
+                        KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone("UTC")));
+                        if (format.fromString(tempCalendar, change.data)) {
+                            KCalendarCore::Incidence::List incidences = tempCalendar->incidences();
+                            if (!incidences.isEmpty()) {
+                                item->setIncidence(incidences.first());
+                                emit cal->dataChanged(cal->index(i, 0), cal->index(i, cal->columnCount() - 1));
+                                qDebug() << "SessionManager: Updated in-memory item" << change.itemId;
+                            }
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
+            if (!calFound) {
+                qDebug() << "SessionManager: Calendar" << change.calId << "not found";
+            }
+        }
+    }
+    emit changesApplied();
+}
+
+void SessionManager::commitChanges(SyncBackend *backend)
+{
     if (LocalBackend *local = qobject_cast<LocalBackend*>(backend)) {
         for (const Change &change : m_changes) {
             if (change.operation == "UPDATE") {
-                // Update the item in the backend
                 local->updateItem(change.calId, change.itemId, change.data);
-
-                // Find the corresponding Cal and update the in-memory item
-                if (m_collectionManager) {
-                    bool calFound = false;
-                    for (Collection *col : m_collectionManager->getCollections()) {
-                            Cal *cal = col->calendar(change.calId);
-                            if (!cal) {
-                                qDebug() << "SessionManager: Cal" << change.calId << "no longer exists";
-                                continue;
-                            }
-                            calFound = true;
-                            for (int i = 0; i < cal->items().size(); ++i) {
-                                CalendarItem *item = cal->items().at(i);
-                                if (!item) {
-                                    qDebug() << "SessionManager: Invalid item at index" << i;
-                                    continue;
-                                }
-                                if (item->id() == change.itemId) {
-                                    KCalendarCore::ICalFormat format;
-                                    KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone("UTC")));
-                                    if (format.fromString(tempCalendar, change.data)) {
-                                        KCalendarCore::Incidence::List incidences = tempCalendar->incidences();
-                                        if (!incidences.isEmpty()) {
-                                            item->setIncidence(incidences.first());
-                                            emit cal->dataChanged(cal->index(i, 0), cal->index(i, cal->columnCount() - 1));
-                                            qDebug() << "SessionManager: Updated in-memory item" << change.itemId;
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-                            break;
-
-                    }
-                    if (!calFound) {
-                        qDebug() << "SessionManager: Calendar" << change.calId << "not found in any collection";
-                    }
-                } else {
-                    qDebug() << "SessionManager: No CollectionManager available";
-                }
-            } else {
-                qDebug() << "SessionManager: Operation" << change.operation << "not yet supported";
+                qDebug() << "SessionManager: Committed change for item" << change.itemId;
             }
         }
         clearCache();
-        emit changesApplied();
     }
 }
 
