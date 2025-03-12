@@ -28,14 +28,13 @@ public:
 
 signals:
     void calendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars);
-    void itemsFetched(const QString &calId, const QList<CalendarItem*> &items); // New
+    void itemsFetched(Cal *cal, const QList<CalendarItem*> &items); // Updated to pass Cal*
 
 private slots:
     void onCollectionsFetched(KJob *job);
 
 private:
     void processNextItemFetch(); // New
-    void fetchItemData(const QString &calId, const KDAV::DavItem::List &items, int index = 0); // New
 
     QStringList m_itemFetchQueue; // New
 

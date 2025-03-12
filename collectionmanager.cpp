@@ -21,6 +21,7 @@ void CollectionManager::addCollection(const QString &name, SyncBackend *initialB
     QString id = QString("col%1").arg(m_collectionCounter++);
     Collection *col = new Collection(id, name, this);
     m_collections.insert(id, col);
+    connect(col, &Collection::idChanged, this, &CollectionManager::onCollectionIdChanged);
 
     if (initialBackend) {
         m_collectionBackends[id] = { initialBackend };
@@ -39,6 +40,18 @@ void CollectionManager::addCollection(const QString &name, SyncBackend *initialB
     } else {
         m_collectionBackends[id] = {};
         emit collectionAdded(col);
+    }
+}
+
+void CollectionManager::onCollectionIdChanged(const QString &oldId, const QString &newId)
+{
+    if (m_collections.contains(oldId)) {
+        Collection *col = m_collections.take(oldId);
+        m_collections[newId] = col;
+        if (m_collectionBackends.contains(oldId)) {
+            QList<SyncBackend*> backends = m_collectionBackends.take(oldId);
+            m_collectionBackends[newId] = backends;
+        }
     }
 }
 
@@ -63,24 +76,39 @@ void CollectionManager::saveBackendConfig(const QString &collectionId, const QSt
     qDebug() << "CollectionManager: Saved backend config for" << collectionId << "to" << kalbPath;
 }
 
-void CollectionManager::onItemsFetched(const QString &calId, const QList<CalendarItem*> &items)
+QList<Collection*> CollectionManager::collections() const
 {
-    if (m_collections.isEmpty()) {
-        qDebug() << "CollectionManager: No collections available";
+    return m_collections.values();
+}
+
+
+void CollectionManager::onItemsFetched(Cal *cal, const QList<CalendarItem*> &items)
+{
+    if (!cal) {
+        qDebug() << "CollectionManager: Received null Cal pointer";
+        qDeleteAll(items);
         return;
     }
 
-    for (auto it = m_collections.constBegin(); it != m_collections.constEnd(); ++it) {
-        Collection *col = it.value();
-        Cal *cal = col->calendar(calId); // Look up the Cal by ID
-        if (cal) { // If found, the calendar exists in this collection
-            qDebug() << "CollectionManager: Received" << items.size() << "items for Cal" << calId;
-            cal->refreshModel(); // Notify views to update
-            emit dataFetched(col); // Notify MainWindow or other listeners
-            break;
-        }
+    QString calId = cal->id();
+    qDebug() << "CollectionManager: onItemsFetched for Cal" << calId << "with" << items.size() << "items";
+
+    // Find the collection containing this Cal
+    Collection *col = qobject_cast<Collection*>(cal->parent());
+    if (!col) {
+        qDebug() << "CollectionManager: No parent collection found for Cal" << calId;
+        qDeleteAll(items);
+        return;
     }
+
+    qDebug() << "CollectionManager: Received" << items.size() << "items for Cal" << calId;
+    for (CalendarItem *item : items) {
+        cal->addItem(item);
+    }
+    // No need to call refreshModel() since addItem already emits signals
+    emit dataFetched(col);
 }
+
 void CollectionManager::onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars)
 {
     qDebug() << "CollectionManager: onCalendarsFetched for" << collectionId << "with" << calendars.size() << "calendars";

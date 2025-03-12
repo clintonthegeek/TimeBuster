@@ -76,38 +76,41 @@ void MainWindow::addCalendarView(Cal *cal)
     subWindow->show();
 }
 
-void MainWindow::onSaveChanges()
+void MainWindow::initializeSessionManager()
 {
-    if (!activeCollection || !sessionManager) {
-        ui->logTextEdit->append("No active collection or session manager!");
-        return;
-    }
-
-    for (SyncBackend *backend : collectionManager->backends()[activeCollection->id()]) {
-        if (LocalBackend *local = qobject_cast<LocalBackend*>(backend)) {
-            sessionManager->commitChanges(local);
-            ui->logTextEdit->append("Changes committed to local storage.");
-            break;
+    if (activeCollection && !activeCollection->id().isEmpty() && QFileInfo(activeCollection->id()).exists()) {
+        qDebug() << "MainWindow: Initializing SessionManager with" << activeCollection->id();
+        if (sessionManager) delete sessionManager;
+        sessionManager = new SessionManager(activeCollection->id(), this);
+        sessionManager->setCollectionManager(collectionManager);
+        sessionManager->setMainWindow(ui);
+        sessionManager->loadCache();
+        connect(sessionManager, &SessionManager::changesApplied, this, &MainWindow::onChangesApplied);
+    } else {
+        qDebug() << "MainWindow: Skipping SessionManager init - no valid .kalb file";
+        if (sessionManager) {
+            delete sessionManager;
+            sessionManager = nullptr;
         }
     }
 }
 
-void MainWindow::initializeSessionManager()
+void MainWindow::onSaveChanges()
 {
-    if (activeCollection && !activeCollection->id().isEmpty()) {
-        qDebug() << "MainWindow: Initializing SessionManager with" << activeCollection->id();
-        if (sessionManager) {
-            delete sessionManager;
+    if (!activeCollection || !sessionManager) {
+        ui->logTextEdit->append("No active collection or session manager!");
+        qDebug() << "MainWindow: Save failed - no activeCollection or sessionManager";
+        return;
+    }
+
+    qDebug() << "MainWindow: Attempting to save changes for collection" << activeCollection->id();
+    for (SyncBackend *backend : collectionManager->backends()[activeCollection->id()]) {
+        if (LocalBackend *local = qobject_cast<LocalBackend*>(backend)) {
+            sessionManager->commitChanges(local, activeCollection);
+            ui->logTextEdit->append("Changes committed to local storage.");
+            qDebug() << "MainWindow: Changes committed to local storage for" << activeCollection->id();
+            break;
         }
-        sessionManager = new SessionManager(activeCollection->id(), this);
-        sessionManager->setCollectionManager(collectionManager); // Pass the correct CollectionManager
-        sessionManager->loadCache();
-        connect(sessionManager, &SessionManager::changesApplied, this, &MainWindow::onChangesApplied);
-        for (SyncBackend *backend : collectionManager->backends()[activeCollection->id()]) {
-            sessionManager->applyToBackend(backend);
-        }
-    } else {
-        qDebug() << "MainWindow: No valid collection ID to initialize SessionManager";
     }
 }
 
@@ -278,7 +281,6 @@ void MainWindow::syncCollections()
     }
     ui->logTextEdit->append("No remote backend to sync for " + activeCollection->name());
 }
-
 void MainWindow::onCollectionAdded(Collection *collection)
 {
     qDebug() << "MainWindow: onCollectionAdded for" << collection->id();
@@ -300,7 +302,7 @@ void MainWindow::onCollectionAdded(Collection *collection)
         for (SyncBackend *backend : backends[collection->id()]) {
             if (CalDAVBackend *caldav = qobject_cast<CalDAVBackend*>(backend)) {
                 qDebug() << "MainWindow: Triggering fetchItems for" << cal->id();
-                caldav->fetchItems(cal);
+                caldav->fetchItems(cal); // Pass Cal* directly
                 break;
             }
         }
@@ -321,7 +323,6 @@ void MainWindow::onEditItem()
         return;
     }
 
-    // Find the CalendarView for the activeCal
     CalendarView *view = nullptr;
     for (QMdiSubWindow *subWindow : ui->mdiArea->subWindowList()) {
         CalendarView *candidate = qobject_cast<CalendarView*>(subWindow->widget());
@@ -336,7 +337,6 @@ void MainWindow::onEditItem()
         return;
     }
 
-    // Get the current selection
     QModelIndex current = view->currentIndex();
     if (!current.isValid()) {
         ui->logTextEdit->append("No item selected for editing!");
@@ -353,7 +353,6 @@ void MainWindow::onEditItem()
     }
 
     if (activeCal->updateItem(row, newSummary)) {
-        // Stage the change using SessionManager
         if (sessionManager) {
             Change change;
             change.calId = activeCal->id();
@@ -362,10 +361,15 @@ void MainWindow::onEditItem()
             KCalendarCore::ICalFormat format;
             KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone("UTC")));
             tempCalendar->addIncidence(activeCal->items().at(row)->incidence());
-            change.data = format.toString(tempCalendar);
+            change.data = format.toString(tempCalendar); // Ensure full data
+            if (change.data.isEmpty()) {
+                qDebug() << "MainWindow: Failed to serialize incidence for item" << change.itemId;
+                return;
+            }
             change.timestamp = QDateTime::currentDateTime();
             sessionManager->stageChange(change);
             qDebug() << "MainWindow: Staged change for item" << change.itemId;
+            ui->logTextEdit->append("Item edited and staged: " + change.itemId);
         } else {
             qDebug() << "MainWindow: No SessionManager available to stage change";
         }

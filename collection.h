@@ -20,7 +20,7 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
     QString id() const { return m_id; }
-    void setId(const QString &id) { m_id = id; } // New setter
+    void setId(const QString &id); // New setter
     QString name() const { return m_name; }
     void addCal(Cal *cal);
     QList<Cal*> calendars() const { return m_calendars; }
@@ -28,6 +28,7 @@ public:
 
 signals:
     void calendarsChanged();
+    void idChanged(const QString &oldId, const QString &newId);
 
 private:
     QString m_id; // Unique across app

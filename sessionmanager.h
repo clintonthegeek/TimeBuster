@@ -6,6 +6,8 @@
 #include <QDateTime>
 #include <QString>
 #include "collectionmanager.h"
+#include "ui_mainwindow.h"
+
 
 struct Change {
     QString calId;
@@ -16,6 +18,7 @@ struct Change {
 };
 
 class SyncBackend;
+class Collection;     // Forward declaration
 
 class SessionManager : public QObject
 {
@@ -30,10 +33,10 @@ public:
     void saveCache();
     void loadCache();
     void clearCache();
-    void applyToBackend(SyncBackend *backend);
-    void commitChanges(SyncBackend *backend); // Commits changes to backend
+        void setMainWindow(Ui::MainWindow *ui) { this->ui = ui; } // New method to set UI
+    //void applyToBackend(SyncBackend *backend);
     int changesCount() const { return m_changes.size(); }
-
+    void commitChanges(SyncBackend *backend, Collection *activeCollection); // Updated to take activeCollection
 
 
     // Set the .kalb file path to determine the delta file location
@@ -47,6 +50,9 @@ private:
     QString m_deltaFilePath;
     QList<Change> m_changes;
     CollectionManager *m_collectionManager = nullptr;
+    void applyDeltaChanges(); // New method to apply changes in-memory
+
+        Ui::MainWindow *ui; // New member for UI access
 };
 
 #endif // SESSIONMANAGER_H

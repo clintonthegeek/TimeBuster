@@ -1,5 +1,7 @@
 #include "cal.h"
 #include "collection.h"
+#include <KCalendarCore/Event>
+#include <KCalendarCore/Todo>
 
 Cal::Cal(const QString &id, const QString &name, Collection *parent)
     : QAbstractTableModel(parent), m_id(id), m_name(name)
@@ -14,14 +16,22 @@ Cal::~Cal()
 
 void Cal::addItem(CalendarItem *item)
 {
-    if (!item || m_items.contains(item)) {
-        qDebug() << "Cal: Item already exists or is null, skipping addition. Please diagnose and fix!";
+    if (!item) {
+        qDebug() << "Cal: Attempted to add null item to calendar" << m_id;
         return;
     }
+    // Check for duplicates by ID
+    for (const CalendarItem *existing : m_items) {
+        if (existing && existing->id() == item->id()) {
+            qDebug() << "Cal: Item with ID" << item->id() << "already exists in calendar" << m_id;
+            return;
+        }
+    }
     beginInsertRows(QModelIndex(), m_items.size(), m_items.size());
-    item->setParent(this); // Ensure Cal owns the item
     m_items.append(item);
+    item->setParent(this); // Ensure ownership
     endInsertRows();
+    qDebug() << "Cal: Added item" << item->id() << "to calendar" << m_id;
 }
 
 void Cal::refreshModel()
@@ -29,26 +39,6 @@ void Cal::refreshModel()
     beginResetModel();
     endResetModel();
     qDebug() << "Cal: Model refreshed for" << m_name;
-}
-
-bool Cal::updateItem(int row, const QString &summary)
-{
-    if (row < 0 || row >= m_items.size()) {
-        qDebug() << "Cal: Invalid row" << row << "for update";
-        return false;
-    }
-
-    CalendarItem *item = m_items[row];
-    KCalendarCore::Incidence::Ptr incidence = item->incidence();
-    if (incidence) {
-        incidence->setSummary(summary); // Update the incidence
-        QModelIndex topLeft = index(row, 1); // Column 1 is Summary
-        emit dataChanged(topLeft, topLeft);
-        qDebug() << "Cal: Updated item" << item->id() << "with summary" << summary;
-        return true;
-    }
-    qDebug() << "Cal: No incidence for item" << item->id();
-    return false;
 }
 
 int Cal::rowCount(const QModelIndex &parent) const
@@ -63,10 +53,26 @@ int Cal::columnCount(const QModelIndex &parent) const
     return 4; // Type, Summary, Start, End/Due
 }
 
+bool Cal::updateItem(int row, const QString &summary)
+{
+    if (row < 0 || row >= m_items.size()) return false;
+    CalendarItem *item = m_items[row];
+    if (item->incidence()) {
+        item->incidence()->setSummary(summary);
+        QModelIndex topLeft = index(row, 1); // Summary column
+        QModelIndex bottomRight = index(row, columnCount() - 1);
+        emit dataChanged(topLeft, bottomRight);
+        return true;
+    }
+    return false;
+}
+
 QVariant Cal::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid() || role != Qt::DisplayRole) return QVariant();
+    if (index.row() < 0 || index.row() >= m_items.size()) return QVariant(); // Add bounds check
     CalendarItem *item = m_items[index.row()];
+    if (!item) return QVariant(); // Add null check
     switch (index.column()) {
     case 0: return item->type();
     case 1: return item->data(Qt::DisplayRole); // Summary
@@ -75,7 +81,6 @@ QVariant Cal::data(const QModelIndex &index, int role) const
     default: return QVariant();
     }
 }
-
 QVariant Cal::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (orientation != Qt::Horizontal || role != Qt::DisplayRole) return QVariant();

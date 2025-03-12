@@ -15,7 +15,7 @@ public:
 
     QString rootPath() const { return m_rootPath; }
     QList<CalendarMetadata> fetchCalendars(const QString &collectionId) override;
-    void storeCalendars(const QString &collectionId, const QList<Cal*> &calendars) override;
+void storeCalendars(const QString &collectionId, const QList<Cal*> &calendars) override;
     void storeItems(Cal *cal, const QList<CalendarItem*> &items) override;
     QList<CalendarItem*> fetchItems(Cal *cal) override;
     void updateItem(const QString &calId, const QString &itemId, const QString &icalData);

@@ -37,6 +37,13 @@ QVariant Collection::data(const QModelIndex &index, int role) const
     }
 }
 
+void Collection::setId(const QString &id)
+{
+    QString oldId = m_id;
+    m_id = id;
+    emit idChanged(oldId, m_id);
+}
+
 Cal* Collection::calendar(const QString &id) const
 {
     for (Cal *cal : m_calendars) {

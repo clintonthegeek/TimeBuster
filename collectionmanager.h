@@ -23,28 +23,27 @@ public:
     QList<SyncBackend*> loadBackendConfig(const QString &collectionId, const QString &kalbPath = QString());
     void setConfigBasePath(const QString &path);
     Collection* collection(const QString &id) const;
+    QList<Collection*> collections() const; // New method to return all collections
 
     QMap<QString, QList<SyncBackend*>> backends() const { return m_collectionBackends; }
     void setBackends(const QString &collectionId, const QList<SyncBackend*> &backends);
-
-    // New method to access collections
-    QList<Collection*> getCollections() const {
-        return m_collections.values();
-    }
-
-    void onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars);
-    void onItemsFetched(const QString &calId, const QList<CalendarItem*> &items);
 
 signals:
     void collectionAdded(Collection *collection);
     void dataFetched(Collection *collection);
     void syncFinished(const QString &collectionId, bool success);
 
+public slots:
+    void onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars);
+    void onItemsFetched(Cal *cal, const QList<CalendarItem*> &items);
+
 private:
     QMap<QString, Collection*> m_collections;
     QMap<QString, QList<SyncBackend*>> m_collectionBackends;
     ConfigManager *m_configManager;
     int m_collectionCounter;
+
+    void onCollectionIdChanged(const QString &oldId, const QString &newId);
 };
 
 #endif // COLLECTIONMANAGER_H
