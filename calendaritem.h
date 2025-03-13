@@ -3,6 +3,8 @@
 
 #include <QObject>
 #include <KCalendarCore/Incidence>
+#include <KCalendarCore/Event> // Added
+#include <KCalendarCore/Todo>  // Added
 
 class CalendarItem : public QObject
 {
@@ -11,7 +13,7 @@ class CalendarItem : public QObject
     Q_PROPERTY(KCalendarCore::Incidence::Ptr incidence READ incidence WRITE setIncidence)
 
 public:
-    explicit CalendarItem(const QString &id, QObject *parent = nullptr);
+    explicit CalendarItem(const QString &calId, const QString &itemUid, QObject *parent = nullptr);
     virtual ~CalendarItem() = default;
 
     QString id() const { return m_id; }
@@ -20,11 +22,10 @@ public:
 
     virtual QString type() const = 0;
     virtual QVariant data(int role) const = 0;
-
     virtual CalendarItem* clone(QObject *parent = nullptr) const = 0;
 
 protected:
-    QString m_id;
+    QString m_id; // calId_itemUid
     KCalendarCore::Incidence::Ptr m_incidence;
 };
 
@@ -32,7 +33,7 @@ class Event : public CalendarItem
 {
     Q_OBJECT
 public:
-    explicit Event(const QString &id, QObject *parent = nullptr);
+    explicit Event(const QString &calId, const QString &itemUid, QObject *parent = nullptr);
     QString type() const override { return "Event"; }
     QVariant data(int role) const override;
     CalendarItem* clone(QObject *parent = nullptr) const override;
@@ -42,7 +43,7 @@ class Todo : public CalendarItem
 {
     Q_OBJECT
 public:
-    explicit Todo(const QString &id, QObject *parent = nullptr);
+    explicit Todo(const QString &calId, const QString &itemUid, QObject *parent = nullptr);
     QString type() const override { return "Todo"; }
     QVariant data(int role) const override;
     CalendarItem* clone(QObject *parent = nullptr) const override;

@@ -5,7 +5,7 @@ Collection::Collection(const QString &id, const QString &name, QObject *parent)
     : QAbstractTableModel(parent), m_id(id), m_name(name)
 {
     // Stubbed dummy data
-    addCal(new Cal("cal1", "Test Calendar", this));
+    //addCal(new Cal("cal1", "Test Calendar", this));
 }
 
 Collection::~Collection()

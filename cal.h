@@ -3,8 +3,8 @@
 
 #include <QObject>
 #include <QAbstractTableModel>
-#include "calendaritem.h"
 #include <QSharedPointer>
+#include "calendaritem.h"
 
 class Collection;
 
@@ -15,24 +15,23 @@ class Cal : public QAbstractTableModel
     Q_PROPERTY(QString name READ name CONSTANT)
 
 public:
-    explicit Cal(const QString &id, const QString &name, Collection *parent = nullptr);
+    explicit Cal(const QString &id, const QString &name, Collection *parent = nullptr); // Changed
     ~Cal() override;
 
     QString id() const { return m_id; }
     QString name() const { return m_name; }
-    void addItem(CalendarItem *item); // Takes ownership via QSharedPointer
-    QList<CalendarItem*> items() const; // Returns raw pointers for compatibility
+    void addItem(CalendarItem *item);
+    QList<CalendarItem*> items() const;
 
-    // QAbstractTableModel
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
 private:
-    QString m_id;
+    QString m_id; // Now set directly
     QString m_name;
-    QList<QSharedPointer<CalendarItem>> m_items; // Owned by Cal
+    QList<QSharedPointer<CalendarItem>> m_items;
 };
 
 #endif // CAL_H

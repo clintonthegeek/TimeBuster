@@ -20,8 +20,14 @@ void CollectionManager::addCollection(const QString &name, SyncBackend *initialB
     Collection *col = new Collection(id, name, this);
     m_collections.insert(id, col);
 
-    connect(col, &Collection::calendarsChanged, this, [this]() {
-        qDebug() << "CollectionManager: Calendars changed in a collection";
+    connect(col, &Collection::calendarsChanged, this, [this, col]() {
+        qDebug() << "CollectionManager: Calendars changed in" << col->id();
+        m_calMap.clear();
+        for (Collection *c : m_collections) {
+            for (Cal *cal : c->calendars()) {
+                m_calMap[cal->id()] = cal;
+            }
+        }
     });
 
     if (initialBackend) {
@@ -30,26 +36,20 @@ void CollectionManager::addCollection(const QString &name, SyncBackend *initialB
         if (LocalBackend *local = qobject_cast<LocalBackend*>(initialBackend)) {
             QList<CalendarMetadata> calendars = local->fetchCalendars(id);
             for (const CalendarMetadata &cal : calendars) {
-                col->addCal(new Cal(cal.id, cal.name, col));
+                col->addCal(new Cal(cal.id, cal.name, col)); // Use backend-provided ID
             }
         } else if (CalDAVBackend *caldav = qobject_cast<CalDAVBackend*>(initialBackend)) {
             connect(caldav, &CalDAVBackend::calendarsFetched, this, &CollectionManager::onCalendarsFetched);
-            connect(caldav, &CalDAVBackend::itemsFetched, this, &CollectionManager::onItemsFetched); // Matches Cal*
+            connect(caldav, &CalDAVBackend::itemsFetched, this, &CollectionManager::onItemsFetched);
             caldav->fetchCalendars(id);
         }
     }
 
+    for (Cal *cal : col->calendars()) {
+        m_calMap[cal->id()] = cal;
+    }
+
     emit collectionAdded(col);
-}
-
-const QMap<QString, QList<SyncBackend*>> &CollectionManager::backends() const
-{
-    return m_backends;
-}
-
-void CollectionManager::onCollectionIdChanged(const QString &newId)
-{
-    qDebug() << "CollectionManager: Collection ID changed to" << newId;
 }
 
 void CollectionManager::onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars)
@@ -61,10 +61,10 @@ void CollectionManager::onCalendarsFetched(const QString &collectionId, const QL
         return;
     }
     for (const CalendarMetadata &cal : calendars) {
-        col->addCal(new Cal(cal.id, cal.name, col));
+        col->addCal(new Cal(cal.id, cal.name, col)); // Use backend-provided ID
     }
+    emit calendarsFetched(collectionId, calendars);
     for (Cal *cal : col->calendars()) {
-        if (cal->id() == "cal1") continue;
         for (SyncBackend *backend : m_backends[collectionId]) {
             if (CalDAVBackend *caldav = qobject_cast<CalDAVBackend*>(backend)) {
                 qDebug() << "CollectionManager: Triggering fetchItems for" << cal->id();
@@ -72,7 +72,6 @@ void CollectionManager::onCalendarsFetched(const QString &collectionId, const QL
             }
         }
     }
-    emit calendarsFetched(collectionId, calendars); // Forward to MainWindow
 }
 
 void CollectionManager::onItemsFetched(Cal *cal, QList<CalendarItem*> items)
@@ -81,5 +80,17 @@ void CollectionManager::onItemsFetched(Cal *cal, QList<CalendarItem*> items)
     for (CalendarItem *item : items) {
         cal->addItem(item);
     }
-    emit itemsFetched(cal, items); // Forward to MainWindow
+    emit itemsFetched(cal, items);
+}
+
+const QMap<QString, QList<SyncBackend*>> &CollectionManager::backends() const
+{
+    return m_backends; // Added
+}
+
+void CollectionManager::onCollectionIdChanged(const QString &newId)
+{
+    qDebug() << "CollectionManager: Collection ID changed to" << newId;
+    // Handle ID change if needed (e.g., update m_collections keys)
+    // For now, just logging
 }

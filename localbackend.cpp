@@ -212,59 +212,31 @@ void LocalBackend::updateItem(const QString &calId, const QString &itemId, const
 
 QList<CalendarItem*> LocalBackend::fetchItems(Cal *cal)
 {
-    qDebug() << "LocalBackend: Fetching items for" << cal->name();
     QList<CalendarItem*> items;
-
-    QString calDirPath = QDir(m_rootPath).filePath(cal->name());
-    QDir calDir(calDirPath);
-    if (!calDir.exists()) {
-        qDebug() << "LocalBackend: No directory found for" << cal->name() << "at" << calDirPath;
-        emit dataFetched();
-        return items;
-    }
-
+    QString calId = cal->id();
+    QString calName = calId.split("_").last();
+    QDir calDir(QDir(m_rootPath).filePath(calName));
     KCalendarCore::ICalFormat format;
-    QStringList icsFiles = calDir.entryList({"*.ics"}, QDir::Files);
-    qDebug() << "LocalBackend: Found" << icsFiles.size() << "ICS files in" << calDirPath << ":" << icsFiles;
-    for (const QString &fileName : icsFiles) {
-        QString filePath = calDir.filePath(fileName);
-        QFile file(filePath);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            qDebug() << "LocalBackend: Failed to open" << filePath << ":" << file.errorString();
-            continue;
+    for (const QString &fileName : calDir.entryList({"*.ics"}, QDir::Files)) {
+        QString itemUid = QFileInfo(fileName).baseName();
+        QFile file(calDir.filePath(fileName));
+        if (file.open(QIODevice::ReadOnly)) {
+            auto incidence = format.fromString(file.readAll());
+            if (incidence) {
+                CalendarItem *item = nullptr;
+                if (incidence->type() == KCalendarCore::Incidence::TypeEvent) {
+                    item = new Event(calId, itemUid, this);
+                } else if (incidence->type() == KCalendarCore::Incidence::TypeTodo) {
+                    item = new Todo(calId, itemUid, this);
+                }
+                if (item) {
+                    item->setIncidence(incidence);
+                    items.append(item);
+                }
+            }
+            file.close();
         }
-
-        QString icalData = QString::fromUtf8(file.readAll());
-        file.close();
-
-        qDebug() << "LocalBackend: Raw ICS data from" << filePath << ":\n" << icalData.left(200) + (icalData.length() > 200 ? "..." : "");
-
-        KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone("UTC")));
-        if (!format.fromString(tempCalendar, icalData)) {
-            qDebug() << "LocalBackend: Failed to parse ICS data from" << filePath << "- Check format or encoding";
-            continue;
-        }
-
-        KCalendarCore::Incidence::List incidences = tempCalendar->incidences();
-        if (incidences.isEmpty()) {
-            qDebug() << "LocalBackend: No incidences found in" << filePath;
-            continue;
-        }
-
-        KCalendarCore::Incidence::Ptr incidence = incidences.first();
-        QString itemIdBase = QFileInfo(fileName).baseName(); // Use the filename base (e.g., 007031bd-1448-4a1a-85b8-1098a792483e)
-        QString itemId = QString("%1_%2").arg(cal->id()).arg(itemIdBase); // Preserve calId prefix for uniqueness
-        CalendarItem *item = CalendarItemFactory::createItem(itemId, incidence, cal);
-        if (!item) {
-            qDebug() << "LocalBackend: Failed to create item from" << filePath;
-            continue;
-        }
-
-        items.append(item);
-        qDebug() << "LocalBackend: Loaded" << item->type() << itemId << "from" << filePath;
-        m_idToPath[itemId] = filePath;
     }
-
     emit dataFetched();
     return items;
 }

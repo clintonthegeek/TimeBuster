@@ -19,6 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(collectionManager, &CollectionManager::collectionAdded, this, &MainWindow::onCollectionAdded);
     connect(collectionManager, &CollectionManager::calendarsFetched, this, &MainWindow::onCalendarsFetched);
     connect(collectionManager, &CollectionManager::itemsFetched, this, &MainWindow::onItemsFetched);
+    connect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated); // New
 
     qDebug() << "MainWindow: Initialized";
 }
@@ -39,16 +40,17 @@ void MainWindow::addCalendarView(Cal *cal)
     subWindow->show();
     activeCal = cal->id();
     qDebug() << "MainWindow: Set activeCal to" << activeCal;
+    if (collectionManager->getCal(activeCal)) {
+        qDebug() << "MainWindow: Focused on" << activeCal;
+    }
 }
 
 void MainWindow::addLocalCollection()
 {
     qDebug() << "MainWindow: Adding local collection";
     Collection *col = new Collection("local0", "Local Collection", this);
-    Cal *cal = new Cal("cal1", "Test Calendar", col);
-    col->addCal(cal);
-    collectionManager->addCollection("local0", nullptr);
-    qDebug() << "MainWindow: Local collection added with cal1";
+    collectionManager->addCollection("local0", new LocalBackend("/path/to/local/storage", this)); // Adjust path
+    qDebug() << "MainWindow: Local collection added";
     activeCollection = col;
 }
 
@@ -96,6 +98,7 @@ void MainWindow::onCollectionAdded(Collection *collection)
         fetchedCalendars.insert(cal->id());
         addCalendarView(cal);
     }
+    activeCal = collection->calendars().isEmpty() ? "" : collection->calendars().first()->id();
     ui->logTextEdit->append("Collection fetched with " + QString::number(collection->calendars().size()) + " calendars");
 }
 
@@ -115,10 +118,29 @@ void MainWindow::onItemsFetched(Cal *cal, QList<CalendarItem*> items)
     Q_UNUSED(items);
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
-            if (view->model()->id() == cal->id()) { // Use model() instead of cal()
-                view->refresh(); // Use existing refresh()
+            if (view->model()->id() == cal->id()) {
+                view->refresh();
                 break;
             }
+        }
+    }
+}
+
+void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
+{
+    if (!window) {
+        activeCal = "";
+        qDebug() << "MainWindow: No active subwindow, cleared activeCal";
+        return;
+    }
+    if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+        activeCal = view->model()->id();
+        qDebug() << "MainWindow: Switched activeCal to" << activeCal;
+        if (collectionManager->getCal(activeCal)) {
+            qDebug() << "MainWindow: Focused on" << activeCal;
+        } else {
+            qDebug() << "MainWindow: ActiveCal" << activeCal << "not found in m_calMap";
+            activeCal = "";
         }
     }
 }

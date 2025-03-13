@@ -29,8 +29,9 @@ private slots:
     void createLocalFromRemote();
     void syncCollections();
     void onCollectionAdded(Collection *collection);
-    void onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars); // Added
-    void onItemsFetched(Cal *cal, QList<CalendarItem*> items); // Added
+    void onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars);
+    void onItemsFetched(Cal *cal, QList<CalendarItem*> items);
+    void onSubWindowActivated(QMdiSubWindow *window); // New
 
 private:
     void addCalendarView(Cal *cal);

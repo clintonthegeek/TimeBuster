@@ -22,6 +22,8 @@ public:
     void storeCalendars(const QString &collectionId, const QList<Cal*> &calendars) override;
     void storeItems(Cal *cal, const QList<CalendarItem*> &items) override;
 
+    void fetchItemData(const QString &calId, const KDAV::DavItem::List &items, int index);
+
     QString serverUrl() const { return m_serverUrl; }
     QString username() const { return m_username; }
     QString password() const { return m_password; }

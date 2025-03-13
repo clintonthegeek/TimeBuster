@@ -1,10 +1,8 @@
 #include "calendaritem.h"
-#include <KCalendarCore/Event>
-#include <KCalendarCore/Todo>
 #include <QDateTime>
 
-CalendarItem::CalendarItem(const QString &id, QObject *parent)
-    : QObject(parent), m_id(id)
+CalendarItem::CalendarItem(const QString &calId, const QString &itemUid, QObject *parent)
+    : QObject(parent), m_id(calId + "_" + itemUid), m_incidence(nullptr)
 {
 }
 
@@ -13,64 +11,52 @@ void CalendarItem::setIncidence(const KCalendarCore::Incidence::Ptr &incidence)
     m_incidence = incidence;
 }
 
-Event::Event(const QString &id, QObject *parent)
-    : CalendarItem(id, parent)
+Event::Event(const QString &calId, const QString &itemUid, QObject *parent)
+    : CalendarItem(calId, itemUid, parent)
 {
 }
 
 QVariant Event::data(int role) const
 {
-    if (!m_incidence) return QVariant();
-    auto event = qSharedPointerCast<KCalendarCore::Event>(m_incidence);
-    switch (role) {
-    case Qt::DisplayRole:
-        return event->summary();
-    case Qt::UserRole:
-        return event->dtStart();
-    case Qt::UserRole + 1:
-        return event->dtEnd();
-    default:
-        return QVariant();
+    if (role == Qt::DisplayRole) {
+        return m_incidence ? m_incidence->summary() : QVariant();
+    } else if (role == Qt::UserRole) {
+        return m_incidence ? m_incidence.staticCast<KCalendarCore::Event>()->dtStart().toString() : QVariant();
+    } else if (role == Qt::UserRole + 1) {
+        return m_incidence ? m_incidence.staticCast<KCalendarCore::Event>()->dtEnd().toString() : QVariant();
     }
+    return QVariant();
 }
 
-Todo::Todo(const QString &id, QObject *parent)
-    : CalendarItem(id, parent)
+CalendarItem* Event::clone(QObject *parent) const
+{
+    if (!m_incidence) return nullptr;
+    Event *clone = new Event(id().split("_").first(), id().split("_").last(), parent);
+    clone->setIncidence(KCalendarCore::Incidence::Ptr(m_incidence->clone())); // Wrap in QSharedPointer
+    return clone;
+}
+
+Todo::Todo(const QString &calId, const QString &itemUid, QObject *parent)
+    : CalendarItem(calId, itemUid, parent)
 {
 }
 
 QVariant Todo::data(int role) const
 {
-    if (!m_incidence) return QVariant();
-    auto todo = qSharedPointerCast<KCalendarCore::Todo>(m_incidence);
-    switch (role) {
-    case Qt::DisplayRole:
-        return todo->summary();
-    case Qt::UserRole:
-        return todo->dtStart(false); // Current occurrence
-    case Qt::UserRole + 1:
-        return todo->dtDue(false);
-    case Qt::UserRole + 2:
-        return todo->percentComplete();
-    default:
-        return QVariant();
+    if (role == Qt::DisplayRole) {
+        return m_incidence ? m_incidence->summary() : QVariant();
+    } else if (role == Qt::UserRole) {
+        return m_incidence ? m_incidence.staticCast<KCalendarCore::Todo>()->dtStart().toString() : QVariant();
+    } else if (role == Qt::UserRole + 1) {
+        return m_incidence ? m_incidence.staticCast<KCalendarCore::Todo>()->dtDue().toString() : QVariant();
     }
-}
-
-CalendarItem* Event::clone(QObject *parent) const
-{
-    Event *newEvent = new Event(m_id, parent);
-    if (m_incidence) {
-        newEvent->setIncidence(KCalendarCore::Incidence::Ptr(m_incidence->clone())); // Wrap in QSharedPointer
-    }
-    return newEvent;
+    return QVariant();
 }
 
 CalendarItem* Todo::clone(QObject *parent) const
 {
-    Todo *newTodo = new Todo(m_id, parent);
-    if (m_incidence) {
-        newTodo->setIncidence(KCalendarCore::Incidence::Ptr(m_incidence->clone())); // Wrap in QSharedPointer
-    }
-    return newTodo;
+    if (!m_incidence) return nullptr;
+    Todo *clone = new Todo(id().split("_").first(), id().split("_").last(), parent);
+    clone->setIncidence(KCalendarCore::Incidence::Ptr(m_incidence->clone())); // Wrap in QSharedPointer
+    return clone;
 }
