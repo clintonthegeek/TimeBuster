@@ -49,7 +49,7 @@ void MainWindow::addLocalCollection()
 {
     qDebug() << "MainWindow: Adding local collection";
     Collection *col = new Collection("local0", "Local Collection", this);
-    collectionManager->addCollection("local0", new LocalBackend("/path/to/local/storage", this)); // Adjust path
+    collectionManager->addCollection("local0", new LocalBackend("/home/clinton/Sync/TimeBuster/local_storage", this)); // Adjust path
     qDebug() << "MainWindow: Local collection added";
     activeCollection = col;
 }

@@ -1,17 +1,11 @@
 #include "localbackend.h"
 #include "cal.h"
-#include "databasemanager.h"
-#include "calendaritemfactory.h"
+#include "calendaritem.h"
 #include <KCalendarCore/ICalFormat>
 #include <KCalendarCore/MemoryCalendar>
 #include <QDir>
 #include <QFile>
-#include <QUrl>
 #include <QDebug>
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QSqlError>
-#include <QRegularExpression>
 
 LocalBackend::LocalBackend(const QString &rootPath, QObject *parent)
     : SyncBackend(parent), m_rootPath(rootPath)
@@ -19,44 +13,25 @@ LocalBackend::LocalBackend(const QString &rootPath, QObject *parent)
     qDebug() << "LocalBackend: Initialized with rootPath" << m_rootPath;
 }
 
-
 QList<CalendarMetadata> LocalBackend::fetchCalendars(const QString &collectionId)
 {
     qDebug() << "LocalBackend: Fetching calendars for collection" << collectionId;
     QList<CalendarMetadata> calendars;
-
-    QSqlDatabase db;
-    if (!DatabaseManager::initializeDatabase(collectionId, m_rootPath, db)) {
-        qDebug() << "LocalBackend: Database initialization failed for" << collectionId;
+    QDir rootDir(m_rootPath);
+    if (!rootDir.exists()) {
+        qDebug() << "LocalBackend: Root directory does not exist:" << m_rootPath;
         emit dataFetched();
         return calendars;
     }
 
-    QSqlQuery query(db);
-    query.exec("SELECT calId, calName, path FROM calendars");
-    if (query.lastError().isValid()) {
-        qDebug() << "LocalBackend: Failed to query calendars:" << query.lastError().text();
+    for (const QString &dirName : rootDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        CalendarMetadata meta;
+        meta.id = collectionId + "_" + dirName.toLower().replace(" ", "_");
+        meta.name = dirName;
+        calendars.append(meta);
+        qDebug() << "LocalBackend: Added calendar" << meta.id << meta.name;
     }
-
-    int count = 0;
-    while (query.next()) {
-        QString calId = query.value("calId").toString();
-        QString calName = query.value("calName").toString();
-        QString calPath = query.value("path").toString();
-        // Ensure calId matches the expected format if it doesn't already
-        if (!calId.startsWith(collectionId + "_")) {
-            QString simplifiedName = calName.toLower().replace(QRegularExpression("[^a-z0-9]"), "_");
-            calId = collectionId + "_" + simplifiedName;
-            qDebug() << "LocalBackend: Normalized calId from" << query.value("calId").toString() << "to" << calId;
-        }
-        calendars.append(CalendarMetadata{calId, calName});
-        m_idToPath[calId] = calPath;
-        qDebug() << "LocalBackend: Loaded calendar" << calName << "at" << calPath << "with calId" << calId;
-        count++;
-    }
-    qDebug() << "LocalBackend: Loaded" << count << "calendars from database";
-
-    db.close();
+    emit calendarsFetched(collectionId, calendars); // Emit signal
     emit dataFetched();
     return calendars;
 }
@@ -64,117 +39,143 @@ QList<CalendarMetadata> LocalBackend::fetchCalendars(const QString &collectionId
 void LocalBackend::storeCalendars(const QString &collectionId, const QList<Cal*> &calendars)
 {
     qDebug() << "LocalBackend: Storing calendars for collection" << collectionId << "with" << calendars.size() << "calendars";
-
-    QSqlDatabase db;
-    if (!DatabaseManager::initializeDatabase(collectionId, m_rootPath, db)) {
-        qDebug() << "LocalBackend: Database initialization failed for" << collectionId;
+    QDir rootDir(m_rootPath);
+    if (!rootDir.exists() && !rootDir.mkpath(".")) {
+        qDebug() << "LocalBackend: Failed to create root directory:" << m_rootPath;
+        emit errorOccurred("Failed to create root directory: " + m_rootPath);
         return;
     }
 
-    db.transaction();
-    QSqlQuery query(db);
-    query.exec("DELETE FROM calendars");
-    if (query.lastError().isValid()) {
-        qDebug() << "LocalBackend: Failed to clear calendars table:" << query.lastError().text();
-        emit errorOccurred("Failed to clear calendars table: " + query.lastError().text());
-        db.rollback();
-        db.close();
-        return;
-    }
-
-    QSqlQuery insertQuery(db);
-    insertQuery.prepare("INSERT INTO calendars (calId, calName, path) VALUES (?, ?, ?)");
     for (const Cal *cal : calendars) {
         if (!cal) {
             qDebug() << "LocalBackend: Skipping null calendar in storeCalendars";
             continue;
         }
-        QString calPath = QDir(m_rootPath).filePath(cal->name());
-        QString simplifiedName = cal->name().toLower().replace(QRegularExpression("[^a-z0-9]"), "_");
-        QString calId = collectionId + "_" + simplifiedName;
-        insertQuery.addBindValue(calId);
-        insertQuery.addBindValue(cal->name());
-        insertQuery.addBindValue(calPath);
-        if (!insertQuery.exec()) {
-            qDebug() << "LocalBackend: Failed to store calendar" << cal->name() << ":" << insertQuery.lastError().text();
-            emit errorOccurred("Failed to store calendar: " + insertQuery.lastError().text());
-            db.rollback();
-            db.close();
-            return;
+        QString calDirPath = QDir(m_rootPath).filePath(cal->name());
+        QDir calDir(calDirPath);
+        if (!calDir.exists() && !calDir.mkpath(".")) {
+            qDebug() << "LocalBackend: Failed to create directory:" << calDirPath;
+            emit errorOccurred("Failed to create calendar directory: " + calDirPath);
+            continue;
         }
-        m_idToPath[calId] = calPath;
-        qDebug() << "LocalBackend: Stored calendar" << cal->name() << "at" << calPath << "with calId" << calId;
+        qDebug() << "LocalBackend: Ensured directory for calendar" << cal->id() << "at" << calDirPath;
     }
-
-    if (!db.commit()) {
-        qDebug() << "LocalBackend: Failed to commit transaction:" << db.lastError().text();
-        emit errorOccurred("Failed to commit transaction: " + db.lastError().text());
-        db.rollback();
-        db.close();
-        return;
-    }
-
-    qDebug() << "LocalBackend: Successfully stored" << calendars.size() << "calendars for collection" << collectionId;
-    db.close();
     emit dataFetched();
+}
+
+QList<CalendarItem*> LocalBackend::fetchItems(Cal *cal)
+{
+    qDebug() << "LocalBackend: Fetching items for calendar ID" << cal->id() << "name" << cal->name();
+    QList<CalendarItem*> items;
+    QString calId = cal->id();
+    QString calDirPath = QDir(m_rootPath).filePath(cal->name());
+    QDir calDir(calDirPath);
+    if (!calDir.exists()) {
+        qDebug() << "LocalBackend: No directory found for" << cal->name() << "at" << calDirPath;
+        emit dataFetched();
+        return items;
+    }
+
+    QStringList icsFiles = calDir.entryList({"*.ics"}, QDir::Files);
+    qDebug() << "LocalBackend: Found" << icsFiles.size() << "ICS files in" << calDirPath;
+    KCalendarCore::ICalFormat format;
+    for (const QString &fileName : icsFiles) {
+        QString filePath = calDir.filePath(fileName);
+        qDebug() << "LocalBackend: Processing file" << filePath;
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qDebug() << "LocalBackend: Failed to open" << filePath << ":" << file.errorString();
+            continue;
+        }
+
+        QString icalData = QString::fromUtf8(file.readAll());
+        file.close();
+        qDebug() << "LocalBackend: Read" << icalData.size() << "bytes from" << filePath;
+        qDebug() << "LocalBackend: ICS data:\n" << icalData.left(200) + (icalData.length() > 200 ? "..." : "");
+
+        KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone::systemTimeZone()));
+        if (!format.fromString(tempCalendar, icalData)) {
+            qDebug() << "LocalBackend: Failed to parse ICS data from" << filePath;
+            continue;
+        }
+
+        KCalendarCore::Incidence::List incidences = tempCalendar->incidences();
+        qDebug() << "LocalBackend: Found" << incidences.size() << "incidences in" << filePath;
+        if (incidences.isEmpty()) {
+            qDebug() << "LocalBackend: No incidences found in" << filePath;
+            continue;
+        }
+
+        KCalendarCore::Incidence::Ptr incidence = incidences.first();
+        qDebug() << "LocalBackend: Incidence type:" << incidence->type() << "UID:" << incidence->uid();
+        QString itemUid = incidence->uid().isEmpty() ? QString::number(qHash(filePath)) : incidence->uid();
+        QString itemId = calId + "_" + itemUid;
+        qDebug() << "LocalBackend: Creating item with ID" << itemId;
+        CalendarItem *item = nullptr;
+        if (incidence->type() == KCalendarCore::IncidenceBase::TypeEvent) {
+            item = new Event(calId, itemUid, cal);
+        } else if (incidence->type() == KCalendarCore::IncidenceBase::TypeTodo) {
+            item = new Todo(calId, itemUid, cal);
+        } else {
+            qDebug() << "LocalBackend: Unsupported incidence type" << incidence->type();
+            continue;
+        }
+
+        if (item) {
+            item->setIncidence(incidence);
+            items.append(item);
+            m_idToPath[itemId] = filePath;
+            qDebug() << "LocalBackend: Loaded" << item->type() << itemId << "from" << filePath;
+        } else {
+            qDebug() << "LocalBackend: Failed to create item for" << filePath;
+        }
+    }
+    qDebug() << "LocalBackend: Fetched" << items.size() << "items for" << cal->name();
+    emit itemsFetched(cal, items);
+    emit dataFetched();
+    return items;
 }
 
 void LocalBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
 {
     qDebug() << "LocalBackend: Storing" << items.size() << "items for" << cal->name();
+    QString calId = cal->id();
     QString calDirPath = QDir(m_rootPath).filePath(cal->name());
     QDir calDir(calDirPath);
-    if (!calDir.exists()) {
-        if (!calDir.mkpath(".")) {
-            qDebug() << "LocalBackend: Failed to create directory" << calDirPath;
-            emit errorOccurred("Failed to create calendar directory: " + calDirPath);
-            return;
-        }
+    if (!calDir.exists() && !calDir.mkpath(".")) {
+        qDebug() << "LocalBackend: Failed to create directory" << calDirPath;
+        emit errorOccurred("Failed to create calendar directory: " + calDirPath);
+        return;
     }
 
     KCalendarCore::ICalFormat format;
     for (const CalendarItem *item : items) {
-        CalendarItem *clonedItem = CalendarItemFactory::createItem(item->id(), item->incidence(), nullptr);
-        if (!clonedItem) {
-            qDebug() << "LocalBackend: Failed to clone item" << item->id();
+        if (!item || !item->incidence()) {
+            qDebug() << "LocalBackend: Skipping invalid item in storeItems";
             continue;
         }
 
-        // Extract the UID from the item ID (e.g., from the URL or filename part)
-        QString itemIdBase = item->id();
-        QRegularExpression urlRegex("([^/]+)\\.ics$"); // Match the last part before .ics
-        QRegularExpressionMatch match = urlRegex.match(itemIdBase);
-        if (match.hasMatch()) {
-            itemIdBase = match.captured(1); // Extract the UID (e.g., 007031bd-1448-4a1a-85b8-1098a792483e)
-        } else {
-            // Fallback to hash if no match (e.g., if ID format changes)
-            itemIdBase = QString::number(qHash(item->id()));
-            qDebug() << "LocalBackend: No UID match, using hash for item" << item->id() << "as" << itemIdBase;
-        }
-
-        QString fileName = itemIdBase + ".ics"; // Use single .ics extension
+        QString itemUid = item->id().split("_").last();
+        QString fileName = QString("%1.ics").arg(itemUid);
         QString filePath = calDir.filePath(fileName);
         QFile file(filePath);
         if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
             qDebug() << "LocalBackend: Failed to open" << filePath << ":" << file.errorString();
             emit errorOccurred("Failed to write item: " + file.errorString());
-            delete clonedItem;
             continue;
         }
 
-        KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone("UTC")));
-        KCalendarCore::Incidence::Ptr incidence = clonedItem->incidence();
-        tempCalendar->addIncidence(incidence);
+        KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone::systemTimeZone()));
+        tempCalendar->addIncidence(item->incidence());
         QString icalData = format.toString(tempCalendar);
         if (file.write(icalData.toUtf8()) == -1) {
             qDebug() << "LocalBackend: Write failed for" << filePath << ":" << file.errorString();
             emit errorOccurred("Write failed: " + file.errorString());
         } else {
-            qDebug() << "LocalBackend: Saved" << clonedItem->type() << clonedItem->id() << "to" << filePath;
-            m_idToPath[clonedItem->id()] = filePath;
+            qDebug() << "LocalBackend: Saved" << item->type() << item->id() << "to" << filePath;
+            m_idToPath[item->id()] = filePath;
         }
         file.close();
-        delete clonedItem;
     }
     emit dataFetched();
 }
@@ -182,16 +183,14 @@ void LocalBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
 void LocalBackend::updateItem(const QString &calId, const QString &itemId, const QString &icalData)
 {
     qDebug() << "LocalBackend: Updating item" << itemId << "for calendar" << calId;
-
-    // Find the file path for the item
-    QString filePath = m_idToPath.value(itemId);
+    QString fullId = calId + "_" + itemId;
+    QString filePath = m_idToPath.value(fullId);
     if (filePath.isEmpty()) {
-        qDebug() << "LocalBackend: No file path found for item" << itemId;
-        emit errorOccurred("No file path found for item: " + itemId);
+        qDebug() << "LocalBackend: No file path found for item" << fullId;
+        emit errorOccurred("No file path found for item: " + fullId);
         return;
     }
 
-    // Write the updated iCal data to the file
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qDebug() << "LocalBackend: Failed to open" << filePath << ":" << file.errorString();
@@ -203,40 +202,8 @@ void LocalBackend::updateItem(const QString &calId, const QString &itemId, const
         qDebug() << "LocalBackend: Write failed for" << filePath << ":" << file.errorString();
         emit errorOccurred("Write failed: " + file.errorString());
     } else {
-        qDebug() << "LocalBackend: Updated item" << itemId << "at" << filePath;
+        qDebug() << "LocalBackend: Updated item" << fullId << "at" << filePath;
     }
     file.close();
     emit dataFetched();
-}
-
-
-QList<CalendarItem*> LocalBackend::fetchItems(Cal *cal)
-{
-    QList<CalendarItem*> items;
-    QString calId = cal->id();
-    QString calName = calId.split("_").last();
-    QDir calDir(QDir(m_rootPath).filePath(calName));
-    KCalendarCore::ICalFormat format;
-    for (const QString &fileName : calDir.entryList({"*.ics"}, QDir::Files)) {
-        QString itemUid = QFileInfo(fileName).baseName();
-        QFile file(calDir.filePath(fileName));
-        if (file.open(QIODevice::ReadOnly)) {
-            auto incidence = format.fromString(file.readAll());
-            if (incidence) {
-                CalendarItem *item = nullptr;
-                if (incidence->type() == KCalendarCore::Incidence::TypeEvent) {
-                    item = new Event(calId, itemUid, this);
-                } else if (incidence->type() == KCalendarCore::Incidence::TypeTodo) {
-                    item = new Todo(calId, itemUid, this);
-                }
-                if (item) {
-                    item->setIncidence(incidence);
-                    items.append(item);
-                }
-            }
-            file.close();
-        }
-    }
-    emit dataFetched();
-    return items;
 }

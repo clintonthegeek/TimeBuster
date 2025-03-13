@@ -2,8 +2,7 @@
 #define LOCALBACKEND_H
 
 #include "syncbackend.h"
-#include "cal.h"
-#include <QObject>
+#include <QDir>
 #include <QMap>
 
 class LocalBackend : public SyncBackend
@@ -15,14 +14,14 @@ public:
 
     QString rootPath() const { return m_rootPath; }
     QList<CalendarMetadata> fetchCalendars(const QString &collectionId) override;
-void storeCalendars(const QString &collectionId, const QList<Cal*> &calendars) override;
+    void storeCalendars(const QString &collectionId, const QList<Cal*> &calendars) override;
     void storeItems(Cal *cal, const QList<CalendarItem*> &items) override;
     QList<CalendarItem*> fetchItems(Cal *cal) override;
     void updateItem(const QString &calId, const QString &itemId, const QString &icalData);
 
 private:
     QString m_rootPath;
-    QMap<QString, QString> m_idToPath;
+    QMap<QString, QString> m_idToPath; // Maps calId_itemUid to file path
 };
 
 #endif // LOCALBACKEND_H

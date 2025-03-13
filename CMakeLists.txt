@@ -23,7 +23,7 @@ qt_add_executable(TimeBuster
     calendarview.h calendarview.cpp
     collection.h collection.cpp
     collectionmanager.h collectionmanager.cpp
-    syncbackend.h syncbackend.cpp
+    syncbackend.h
     localbackend.h localbackend.cpp
     caldavbackend.h caldavbackend.cpp
     configmanager.h configmanager.cpp
@@ -32,6 +32,7 @@ qt_add_executable(TimeBuster
     databasemanager.h databasemanager.cpp
     sessionmanager.h sessionmanager.cpp
     calendaritemfactory.h calendaritemfactory.cpp
+    DatabaseManager.h
 )
 
 target_link_libraries(TimeBuster

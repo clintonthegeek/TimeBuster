@@ -28,6 +28,7 @@ public:
     QString username() const { return m_username; }
     QString password() const { return m_password; }
 
+        void updateItem(const QString &calId, const QString &itemId, const QString &icalData) override; // Added
 signals:
     void calendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars);
     void itemsFetched(Cal *cal, const QList<CalendarItem*> &items); // Updated to pass Cal*

@@ -25,6 +25,39 @@ CalDAVBackend::~CalDAVBackend()
     m_itemFetchQueue.clear();
 }
 
+QList<CalendarMetadata> CalDAVBackend::fetchCalendars(const QString &collectionId)
+{
+    qDebug() << "CalDAVBackend: Starting fetchCalendars for collection" << collectionId;
+    QUrl url(m_serverUrl);
+    url.setUserName(m_username);
+    url.setPassword(m_password);
+    qDebug() << "CalDAV URL:" << url.toString(QUrl::RemovePassword);
+
+    KDAV::DavUrl davUrl(url, KDAV::CalDav);
+    KDAV::DavCollectionsFetchJob *job = new KDAV::DavCollectionsFetchJob(davUrl);
+    job->setProperty("collectionId", collectionId);
+    connect(job, &KDAV::DavCollectionsFetchJob::result, this, &CalDAVBackend::onCollectionsFetched);
+    qDebug() << "CalDAVBackend: Job created, starting...";
+    job->start();
+
+    qDebug() << "CalDAVBackend: fetchCalendars returning empty list (async)";
+    emit calendarsFetched(collectionId, QList<CalendarMetadata>()); // Ensure emission
+    return QList<CalendarMetadata>();
+}
+
+void CalDAVBackend::storeCalendars(const QString &collectionId, const QList<Cal*> &calendars)
+{
+    qDebug() << "CalDAVBackend: storeCalendars stub for" << collectionId;
+    for (Cal *cal : calendars) {
+        m_idToUrl[cal->id()] = m_serverUrl + "/" + cal->id();
+    }
+}
+
+void CalDAVBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
+{
+    qDebug() << "CalDAVBackend: storeItems stub for" << cal->id();
+}
+
 QList<CalendarItem*> CalDAVBackend::fetchItems(Cal *cal)
 {
     QString calId = cal->id();
@@ -68,7 +101,7 @@ void CalDAVBackend::onCollectionsFetched(KJob *job)
         if (col.contentTypes() & (KDAV::DavCollection::Events | KDAV::DavCollection::Todos | KDAV::DavCollection::Calendar)) {
             CalendarMetadata meta;
             QString simplifiedName = col.displayName().toLower().replace(QRegularExpression("[^a-z0-9]"), "_");
-            meta.id = collectionId + "_" + simplifiedName; // Correct ID
+            meta.id = collectionId + "_" + simplifiedName;
             meta.name = col.displayName().isEmpty() ? col.url().toDisplayString() : col.displayName();
             calendars.append(meta);
             m_idToUrl[meta.id] = col.url().toDisplayString();
@@ -194,34 +227,9 @@ void CalDAVBackend::processNextItemFetch()
     listJob->start();
 }
 
-QList<CalendarMetadata> CalDAVBackend::fetchCalendars(const QString &collectionId)
+void CalDAVBackend::updateItem(const QString &calId, const QString &itemId, const QString &icalData)
 {
-    qDebug() << "CalDAVBackend: Starting fetchCalendars for collection" << collectionId;
-    QUrl url(m_serverUrl);
-    url.setUserName(m_username);
-    url.setPassword(m_password);
-    qDebug() << "CalDAV URL:" << url.toString(QUrl::RemovePassword);
-
-    KDAV::DavUrl davUrl(url, KDAV::CalDav);
-    KDAV::DavCollectionsFetchJob *job = new KDAV::DavCollectionsFetchJob(davUrl);
-    job->setProperty("collectionId", collectionId);
-    connect(job, &KDAV::DavCollectionsFetchJob::result, this, &CalDAVBackend::onCollectionsFetched);
-    qDebug() << "CalDAVBackend: Job created, starting...";
-    job->start();
-
-    qDebug() << "CalDAVBackend: fetchCalendars returning empty list (async)";
-    return QList<CalendarMetadata>();
-}
-
-void CalDAVBackend::storeCalendars(const QString &collectionId, const QList<Cal*> &calendars)
-{
-    qDebug() << "CalDAVBackend: storeCalendars stub for" << collectionId;
-    for (Cal *cal : calendars) {
-        m_idToUrl[cal->id()] = m_serverUrl + "/" + cal->id();
-    }
-}
-
-void CalDAVBackend::storeItems(Cal *cal, const QList<CalendarItem*> &items)
-{
-    qDebug() << "CalDAVBackend: storeItems stub for" << cal->id();
+    qDebug() << "CalDAVBackend: updateItem stub for" << calId << "item" << itemId;
+    // TODO: Implement actual update logic using KDAV (e.g., PUT request)
+    emit errorOccurred("Update not implemented for CalDAVBackend");
 }
