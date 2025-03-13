@@ -4,6 +4,7 @@
 #include <QAbstractTableModel>
 #include "cal.h"
 #include <QList>
+#include <QSharedPointer>
 
 class Collection : public QAbstractTableModel
 {
@@ -20,20 +21,17 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
     QString id() const { return m_id; }
-    void setId(const QString &id); // New setter
     QString name() const { return m_name; }
-    void addCal(Cal *cal);
-    QList<Cal*> calendars() const { return m_calendars; }
-    Cal* calendar(const QString &id) const;
+    void addCal(Cal *cal); // Takes ownership via QSharedPointer
+    QList<Cal*> calendars() const; // Returns raw pointers for compatibility
 
 signals:
     void calendarsChanged();
-    void idChanged(const QString &oldId, const QString &newId);
 
 private:
     QString m_id; // Unique across app
     QString m_name; // User-facing name
-    QList<Cal*> m_calendars; // Owned by Collection
+    QList<QSharedPointer<Cal>> m_calendars; // Owned by Collection
 };
 
 #endif // COLLECTION_H

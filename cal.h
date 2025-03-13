@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QAbstractTableModel>
 #include "calendaritem.h"
+#include <QSharedPointer>
 
 class Collection;
 
@@ -19,10 +20,8 @@ public:
 
     QString id() const { return m_id; }
     QString name() const { return m_name; }
-    void addItem(CalendarItem *item);
-    QList<CalendarItem*> items() const { return m_items; }
-    bool updateItem(int row, const QString &summary); // New method to edit an item
-    void refreshModel(); // New method to refresh the model
+    void addItem(CalendarItem *item); // Takes ownership via QSharedPointer
+    QList<CalendarItem*> items() const; // Returns raw pointers for compatibility
 
     // QAbstractTableModel
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -31,9 +30,9 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
 private:
-    QString m_id; // Raw ID, e.g., "https://.../personal/"
-    QString m_name; // Clean name, e.g., "personal"
-    QList<CalendarItem*> m_items;
+    QString m_id;
+    QString m_name;
+    QList<QSharedPointer<CalendarItem>> m_items; // Owned by Cal
 };
 
 #endif // CAL_H

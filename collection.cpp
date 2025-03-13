@@ -1,15 +1,16 @@
 #include "collection.h"
+#include <QDebug>
 
 Collection::Collection(const QString &id, const QString &name, QObject *parent)
     : QAbstractTableModel(parent), m_id(id), m_name(name)
 {
     // Stubbed dummy data
-
+    addCal(new Cal("cal1", "Test Calendar", this));
 }
 
 Collection::~Collection()
 {
-    qDeleteAll(m_calendars); // Clean up owned Cal objects
+    // QSharedPointer handles deletion automatically when ref count hits 0
 }
 
 int Collection::rowCount(const QModelIndex &parent) const
@@ -29,27 +30,12 @@ QVariant Collection::data(const QModelIndex &index, int role) const
     if (!index.isValid() || role != Qt::DisplayRole)
         return QVariant();
 
-    Cal *cal = m_calendars.at(index.row());
+    Cal *cal = m_calendars.at(index.row()).data();
     switch (index.column()) {
     case 0: return cal->id();
-    case 1: return cal->name(); //implement displayName() once thre!
+    case 1: return cal->name();
     default: return QVariant();
     }
-}
-
-void Collection::setId(const QString &id)
-{
-    QString oldId = m_id;
-    m_id = id;
-    emit idChanged(oldId, m_id);
-}
-
-Cal* Collection::calendar(const QString &id) const
-{
-    for (Cal *cal : m_calendars) {
-        if (cal->id() == id) return cal;
-    }
-    return nullptr;
 }
 
 QVariant Collection::headerData(int section, Qt::Orientation orientation, int role) const
@@ -67,8 +53,17 @@ QVariant Collection::headerData(int section, Qt::Orientation orientation, int ro
 void Collection::addCal(Cal *cal)
 {
     beginInsertRows(QModelIndex(), m_calendars.size(), m_calendars.size());
-    m_calendars.append(cal);
-    cal->setParent(this); // Take ownership
+    m_calendars.append(QSharedPointer<Cal>(cal));
+    cal->setParent(this); // Qt parenting for signals
     endInsertRows();
     emit calendarsChanged();
+}
+
+QList<Cal*> Collection::calendars() const
+{
+    QList<Cal*> rawPointers;
+    for (const auto &cal : m_calendars) {
+        rawPointers.append(cal.data());
+    }
+    return rawPointers;
 }
