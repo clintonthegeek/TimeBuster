@@ -34,7 +34,8 @@ void CollectionManager::addCollection(const QString &name, SyncBackend *initialB
             }
         } else if (CalDAVBackend *caldav = qobject_cast<CalDAVBackend*>(initialBackend)) {
             connect(caldav, &CalDAVBackend::calendarsFetched, this, &CollectionManager::onCalendarsFetched);
-            caldav->fetchCalendars(id); // Async, handled in slot
+            connect(caldav, &CalDAVBackend::itemsFetched, this, &CollectionManager::onItemsFetched); // Matches Cal*
+            caldav->fetchCalendars(id);
         }
     }
 
@@ -62,8 +63,8 @@ void CollectionManager::onCalendarsFetched(const QString &collectionId, const QL
     for (const CalendarMetadata &cal : calendars) {
         col->addCal(new Cal(cal.id, cal.name, col));
     }
-    // Trigger fetchItems for each new Cal
     for (Cal *cal : col->calendars()) {
+        if (cal->id() == "cal1") continue;
         for (SyncBackend *backend : m_backends[collectionId]) {
             if (CalDAVBackend *caldav = qobject_cast<CalDAVBackend*>(backend)) {
                 qDebug() << "CollectionManager: Triggering fetchItems for" << cal->id();
@@ -71,4 +72,14 @@ void CollectionManager::onCalendarsFetched(const QString &collectionId, const QL
             }
         }
     }
+    emit calendarsFetched(collectionId, calendars); // Forward to MainWindow
+}
+
+void CollectionManager::onItemsFetched(Cal *cal, QList<CalendarItem*> items)
+{
+    qDebug() << "CollectionManager: Received itemsFetched for" << cal->id() << "with" << items.size() << "items";
+    for (CalendarItem *item : items) {
+        cal->addItem(item);
+    }
+    emit itemsFetched(cal, items); // Forward to MainWindow
 }

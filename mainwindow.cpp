@@ -17,13 +17,15 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::createLocalFromRemote);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
     connect(collectionManager, &CollectionManager::collectionAdded, this, &MainWindow::onCollectionAdded);
+    connect(collectionManager, &CollectionManager::calendarsFetched, this, &MainWindow::onCalendarsFetched);
+    connect(collectionManager, &CollectionManager::itemsFetched, this, &MainWindow::onItemsFetched);
 
     qDebug() << "MainWindow: Initialized";
 }
 
 MainWindow::~MainWindow()
 {
-    delete ui; // Deletes collectionManager and credentialsDialog as children
+    delete ui;
 }
 
 void MainWindow::addCalendarView(Cal *cal)
@@ -35,7 +37,7 @@ void MainWindow::addCalendarView(Cal *cal)
     ui->mdiArea->addSubWindow(subWindow);
     subWindow->resize(400, 300);
     subWindow->show();
-    activeCal = cal->id(); // Store ID instead of pointer
+    activeCal = cal->id();
     qDebug() << "MainWindow: Set activeCal to" << activeCal;
 }
 
@@ -93,7 +95,30 @@ void MainWindow::onCollectionAdded(Collection *collection)
         if (fetchedCalendars.contains(cal->id())) continue;
         fetchedCalendars.insert(cal->id());
         addCalendarView(cal);
-        // Remove fetchItems call - handled by CollectionManager now
     }
     ui->logTextEdit->append("Collection fetched with " + QString::number(collection->calendars().size()) + " calendars");
+}
+
+void MainWindow::onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars)
+{
+    Q_UNUSED(calendars);
+    if (activeCollection && activeCollection->id() == collectionId) {
+        for (Cal *cal : activeCollection->calendars()) {
+            if (cal->id() == "cal1") continue;
+            addCalendarView(cal);
+        }
+    }
+}
+
+void MainWindow::onItemsFetched(Cal *cal, QList<CalendarItem*> items)
+{
+    Q_UNUSED(items);
+    for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
+        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+            if (view->model()->id() == cal->id()) { // Use model() instead of cal()
+                view->refresh(); // Use existing refresh()
+                break;
+            }
+        }
+    }
 }

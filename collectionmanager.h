@@ -19,10 +19,13 @@ public:
 
 signals:
     void collectionAdded(Collection *collection);
+    void calendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars); // Forwarded
+    void itemsFetched(Cal *cal, QList<CalendarItem*> items); // Forwarded
 
 private slots:
     void onCollectionIdChanged(const QString &newId);
-    void onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars); // New
+    void onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars);
+    void onItemsFetched(Cal *cal, QList<CalendarItem*> items);
 
 private:
     QMap<QString, Collection*> m_collections;

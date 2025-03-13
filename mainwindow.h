@@ -5,11 +5,11 @@
 #include <QMdiSubWindow>
 #include "credentialsdialog.h"
 #include "syncbackend.h"
-#include "collection.h" // Added to define Collection fully
+#include "collection.h"
 
 class CollectionManager;
 class Cal;
-// class Collection; // No longer needed as a forward declaration
+class Collection;
 
 namespace Ui {
 class MainWindow;
@@ -29,14 +29,16 @@ private slots:
     void createLocalFromRemote();
     void syncCollections();
     void onCollectionAdded(Collection *collection);
+    void onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars); // Added
+    void onItemsFetched(Cal *cal, QList<CalendarItem*> items); // Added
 
 private:
     void addCalendarView(Cal *cal);
-    CredentialsDialog *credentialsDialog; // Owned
+    CredentialsDialog *credentialsDialog;
     Ui::MainWindow *ui;
-    CollectionManager *collectionManager; // Owned
-    QString activeCal; // Now a calId instead of Cal*
-    Collection *activeCollection; // Still a pointer for now
+    CollectionManager *collectionManager;
+    QString activeCal;
+    Collection *activeCollection;
 };
 
 #endif // MAINWINDOW_H

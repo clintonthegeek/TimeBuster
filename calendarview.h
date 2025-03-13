@@ -15,14 +15,16 @@ public:
 
     Cal *model() const { return calModel; }
     QModelIndex currentIndex() const { return tableView->currentIndex(); }
-    void refresh(); // New method to refresh the view
+
+public slots:
+    void refresh(); // Already implemented, now a slot
 
 signals:
-    void selectionChanged(); // New signal for when selection changes
+    void selectionChanged(); // For selection changes
 
 private:
     QTableView *tableView;
-    Cal *calModel; // Not owned - MainWindow or CollectionManager owns it
+    Cal *calModel; // Not owned
 };
 
 #endif // CALENDARVIEW_H
