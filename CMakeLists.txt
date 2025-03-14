@@ -22,7 +22,7 @@ qt_add_executable(TimeBuster
     cal.h cal.cpp
     calendarview.h calendarview.cpp
     collection.h collection.cpp
-    collectionmanager.h collectionmanager.cpp
+    collectioncontroller.h collectioncontroller.cpp
     syncbackend.h
     localbackend.h localbackend.cpp
     caldavbackend.h caldavbackend.cpp

@@ -3,8 +3,8 @@
 
 #include <QObject>
 #include <QAbstractTableModel>
-#include <QSharedPointer>
 #include "calendaritem.h"
+#include <QSharedPointer>
 
 class Collection;
 
@@ -15,21 +15,24 @@ class Cal : public QAbstractTableModel
     Q_PROPERTY(QString name READ name CONSTANT)
 
 public:
-    explicit Cal(const QString &id, const QString &name, Collection *parent = nullptr); // Changed
-    ~Cal() override;
+    explicit Cal(const QString &id, const QString &name, Collection *parent = nullptr);
+    ~Cal() override = default;
 
     QString id() const { return m_id; }
     QString name() const { return m_name; }
-    void addItem(CalendarItem *item);
-    QList<CalendarItem*> items() const;
+    void addItem(QSharedPointer<CalendarItem> item);
+    QList<QSharedPointer<CalendarItem>> items() const { return m_items; }
 
+    // QAbstractTableModel
+    QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
+    QModelIndex parent(const QModelIndex &index) const override;
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
 private:
-    QString m_id; // Now set directly
+    QString m_id;
     QString m_name;
     QList<QSharedPointer<CalendarItem>> m_items;
 };

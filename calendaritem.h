@@ -2,9 +2,10 @@
 #define CALENDARITEM_H
 
 #include <QObject>
+#include <QSharedPointer>
 #include <KCalendarCore/Incidence>
-#include <KCalendarCore/Event> // Added
-#include <KCalendarCore/Todo>  // Added
+#include <KCalendarCore/Event>  // Added for Event definition
+#include <KCalendarCore/Todo>   // Added for Todo definition
 
 class CalendarItem : public QObject
 {
@@ -20,13 +21,20 @@ public:
     KCalendarCore::Incidence::Ptr incidence() const { return m_incidence; }
     void setIncidence(const KCalendarCore::Incidence::Ptr &incidence);
 
+    QDateTime lastModified() const { return m_lastModified; }
+    void setLastModified(const QDateTime &lastModified) { m_lastModified = lastModified; }
+    QString etag() const { return m_etag; }
+    void setEtag(const QString &etag) { m_etag = etag; }
+
     virtual QString type() const = 0;
     virtual QVariant data(int role) const = 0;
     virtual CalendarItem* clone(QObject *parent = nullptr) const = 0;
 
 protected:
-    QString m_id; // calId_itemUid
+    QString m_id;
     KCalendarCore::Incidence::Ptr m_incidence;
+    QDateTime m_lastModified;
+    QString m_etag;
 };
 
 class Event : public CalendarItem

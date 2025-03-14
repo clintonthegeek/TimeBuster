@@ -3,8 +3,8 @@
 #include <QFile>
 #include <QDebug>
 
-SessionManager::SessionManager(CollectionManager *collectionManager, const QString &sessionPath, QObject *parent)
-    : QObject(parent), m_collectionManager(collectionManager), m_sessionPath(sessionPath)
+SessionManager::SessionManager(CollectionController *collectionController, const QString &sessionPath, QObject *parent)
+    : QObject(parent), m_collectionController(collectionController), m_sessionPath(sessionPath)
 {
 }
 
@@ -35,7 +35,7 @@ void SessionManager::applyDeltaChanges()
         QString icalData = parts.mid(3).join(" ");
 
         if (operation == "UPDATE") {
-            for (Collection *col : m_collectionManager->collections()) {
+            for (Collection *col : m_collectionController->collections()) {
                 for (Cal *cal : col->calendars()) {
                     if (cal->id() == calId) {
                         qDebug() << "SessionManager: Applying delta update for" << itemId;

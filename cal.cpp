@@ -8,16 +8,26 @@ Cal::Cal(const QString &id, const QString &name, Collection *parent)
     qDebug() << "Cal: Created with id" << m_id << "name" << m_name;
 }
 
-Cal::~Cal()
-{
-    // QSharedPointer handles deletion automatically when ref count hits 0
-}
-
-void Cal::addItem(CalendarItem *item)
+void Cal::addItem(QSharedPointer<CalendarItem> item)
 {
     beginInsertRows(QModelIndex(), m_items.size(), m_items.size());
-    m_items.append(QSharedPointer<CalendarItem>(item));
+    m_items.append(item);
     endInsertRows();
+    qDebug() << "Cal: Added item" << item->id() << "to" << m_id;
+}
+
+QModelIndex Cal::index(int row, int column, const QModelIndex &parent) const
+{
+    if (!hasIndex(row, column, parent) || parent.isValid()) {
+        return QModelIndex();
+    }
+    return createIndex(row, column);
+}
+
+QModelIndex Cal::parent(const QModelIndex &index) const
+{
+    Q_UNUSED(index);
+    return QModelIndex();
 }
 
 int Cal::rowCount(const QModelIndex &parent) const
@@ -57,11 +67,3 @@ QVariant Cal::headerData(int section, Qt::Orientation orientation, int role) con
     }
 }
 
-QList<CalendarItem*> Cal::items() const
-{
-    QList<CalendarItem*> rawPointers;
-    for (const auto &item : m_items) {
-        rawPointers.append(item.data());
-    }
-    return rawPointers;
-}

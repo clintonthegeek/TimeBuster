@@ -6,10 +6,10 @@
 #include "credentialsdialog.h"
 #include "syncbackend.h"
 #include "collection.h"
+#include <QSharedPointer>
 
-class CollectionManager;
+class CollectionController;
 class Cal;
-class Collection;
 
 namespace Ui {
 class MainWindow;
@@ -29,15 +29,15 @@ private slots:
     void createLocalFromRemote();
     void syncCollections();
     void onCollectionAdded(Collection *collection);
-    void onCalendarsFetched(const QString &collectionId, const QList<CalendarMetadata> &calendars);
-    void onItemsFetched(Cal *cal, QList<CalendarItem*> items);
-    void onSubWindowActivated(QMdiSubWindow *window); // New
+    void onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars); // Renamed
+    void onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items); // Updated
+    void onSubWindowActivated(QMdiSubWindow *window);
 
 private:
     void addCalendarView(Cal *cal);
     CredentialsDialog *credentialsDialog;
     Ui::MainWindow *ui;
-    CollectionManager *collectionManager;
+    CollectionController *collectionController;
     QString activeCal;
     Collection *activeCollection;
 };

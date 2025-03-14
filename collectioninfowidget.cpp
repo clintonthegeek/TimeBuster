@@ -32,7 +32,7 @@ void CollectionInfoWidget::setCollection(Collection *collection)
     QTreeWidgetItem *backendsItem = new QTreeWidgetItem(root);
     backendsItem->setText(0, "Backends");
 
-    // Assume MainWindow or CollectionManager passes backends later
+    // Assume MainWindow or CollectionController passes backends later
     // For now, this is a placeholder - we'll integrate with actual backends in MainWindow
     QTreeWidgetItem *backendPlaceholder = new QTreeWidgetItem(backendsItem);
     backendPlaceholder->setText(0, "Unknown");
