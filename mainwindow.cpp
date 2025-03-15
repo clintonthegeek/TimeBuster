@@ -5,6 +5,7 @@
 #include "localbackend.h"
 #include "caldavbackend.h"
 #include <QDebug>
+#include <QFileDialog>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), credentialsDialog(new CredentialsDialog(this)),
@@ -14,7 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->actionAddLocalCollection, &QAction::triggered, this, &MainWindow::addLocalCollection);
     connect(ui->actionAddRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
-    connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::createLocalFromRemote);
+    connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::attachActiveToLocal); // Updated connection
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
     connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
     connect(collectionController, &CollectionController::calendarsLoaded, this, &MainWindow::onCalendarsLoaded);
@@ -71,9 +72,60 @@ void MainWindow::addRemoteCollection()
     }
 }
 
-void MainWindow::createLocalFromRemote()
+void MainWindow::attachActiveToLocal()
 {
-    ui->logTextEdit->append("Create Local from Remote triggered (stub)");
+    if (!activeCollection) {
+        ui->logTextEdit->append("No active collection to attach");
+        qDebug() << "MainWindow: No active collection for attachActiveToLocal";
+        return;
+    }
+
+    // Open QFileDialog to select a folder and save a .kalb file
+    QString filePath = QFileDialog::getSaveFileName(
+        this,
+        tr("Attach Collection to Local Backend"),
+        QDir::homePath(),
+        tr("KALB Files (*.kalb)")
+        );
+
+    if (filePath.isEmpty()) {
+        ui->logTextEdit->append("Attach to local canceled");
+        qDebug() << "MainWindow: Attach to local canceled by user";
+        return;
+    }
+
+    // Ensure the file has a .kalb extension
+    if (!filePath.endsWith(".kalb")) {
+        filePath += ".kalb";
+    }
+
+    // The parent directory of the .kalb file will be the rootPath for LocalBackend
+    QFileInfo fileInfo(filePath);
+    QString rootPath = fileInfo.absolutePath();
+
+    // Create a minimal .kalb file (for now, just a placeholder)
+    QFile kalbFile(filePath);
+    if (!kalbFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        ui->logTextEdit->append("Failed to create .kalb file: " + kalbFile.errorString());
+        qDebug() << "MainWindow: Failed to create .kalb file:" << kalbFile.errorString();
+        return;
+    }
+    QTextStream out(&kalbFile);
+    out << "[Collection]\n";
+    out << "id=" << activeCollection->id() << "\n";
+    out << "name=" << activeCollection->name() << "\n";
+    kalbFile.close();
+
+    qDebug() << "MainWindow: Created .kalb file at" << filePath << "with rootPath" << rootPath;
+
+    // Create a LocalBackend with the selected rootPath
+    LocalBackend *localBackend = new LocalBackend(rootPath, this);
+
+    // Attach the LocalBackend to the active collection via CollectionController
+    collectionController->attachLocalBackend(activeCollection->id(), localBackend);
+
+    ui->logTextEdit->append("Attached collection to local backend at " + rootPath);
+    qDebug() << "MainWindow: Attached LocalBackend to collection" << activeCollection->id();
 }
 
 void MainWindow::syncCollections()

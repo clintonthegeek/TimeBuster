@@ -26,7 +26,7 @@ public:
 private slots:
     void addLocalCollection();
     void addRemoteCollection();
-    void createLocalFromRemote();
+    void attachActiveToLocal(); // Renamed from createLocalFromRemote
     void syncCollections();
     void onCollectionAdded(Collection *collection);
     void onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars); // Renamed

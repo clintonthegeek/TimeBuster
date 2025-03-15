@@ -17,9 +17,9 @@ void ConfigManager::setBasePath(const QString &path)
 QString ConfigManager::configPath(const QString &collectionId, const QString &kalbPath) const
 {
     if (!kalbPath.isEmpty()) {
-        return kalbPath; // Use provided path for Open/Attach
+        return kalbPath;
     }
-    QDir dir(m_basePath.isEmpty() ? "configs" : m_basePath); // Fallback
+    QDir dir(m_basePath.isEmpty() ? "configs" : m_basePath);
     if (!dir.exists()) dir.mkpath(".");
     return dir.filePath(collectionId + ".kalb");
 }
@@ -66,4 +66,3 @@ QList<SyncBackend*> ConfigManager::loadBackendConfig(const QString &collectionId
     settings.endArray();
     return backends;
 }
-
