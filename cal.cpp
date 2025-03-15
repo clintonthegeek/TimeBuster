@@ -10,10 +10,48 @@ Cal::Cal(const QString &id, const QString &name, Collection *parent)
 
 void Cal::addItem(QSharedPointer<CalendarItem> item)
 {
+    if (!item) {
+        qDebug() << "Cal: Cannot add null item to" << m_id;
+        return;
+    }
     beginInsertRows(QModelIndex(), m_items.size(), m_items.size());
     m_items.append(item);
     endInsertRows();
     qDebug() << "Cal: Added item" << item->id() << "to" << m_id;
+}
+
+void Cal::updateItem(const QSharedPointer<CalendarItem> &item)
+{
+    if (!item) {
+        qDebug() << "Cal: Cannot update with null item in" << m_id;
+        return;
+    }
+    for (int i = 0; i < m_items.size(); ++i) {
+        if (m_items[i]->id() == item->id()) {
+            m_items[i] = item;
+            emit itemsChanged();
+            qDebug() << "Cal: Updated item" << item->id() << "in" << m_id;
+            return;
+        }
+    }
+    qDebug() << "Cal: Item" << item->id() << "not found for update in" << m_id;
+}
+
+void Cal::removeItem(const QSharedPointer<CalendarItem> &item)
+{
+    if (!item) {
+        qDebug() << "Cal: Cannot remove null item from" << m_id;
+        return;
+    }
+    for (int i = 0; i < m_items.size(); ++i) {
+        if (m_items[i]->id() == item->id()) {
+            m_items.removeAt(i);
+            emit itemsChanged();
+            qDebug() << "Cal: Removed item" << item->id() << "from" << m_id;
+            return;
+        }
+    }
+    qDebug() << "Cal: Item" << item->id() << "not found for removal in" << m_id;
 }
 
 QModelIndex Cal::index(int row, int column, const QModelIndex &parent) const

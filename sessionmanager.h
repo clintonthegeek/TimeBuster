@@ -6,20 +6,18 @@
 #include "syncbackend.h"
 #include "collectioncontroller.h"
 #include "collection.h" // Added for full Collection definition
+#include "deltachange.h"
 
 class SessionManager : public QObject
 {
     Q_OBJECT
 public:
-    explicit SessionManager(CollectionController *collectionController, const QString &sessionPath, QObject *parent = nullptr);
-    void stageChange(const QString &calId, const QString &itemId, const QString &icalData);
-    void commitChanges(SyncBackend *activeBackend, Collection *activeCollection);
+    explicit SessionManager(CollectionController *controller, QObject *parent = nullptr);
+    void queueDeltaChange(const QString &calId, const QSharedPointer<CalendarItem> &item, DeltaChange::Type change);
     void applyDeltaChanges();
 
 private:
     CollectionController *m_collectionController;
-    QString m_sessionPath;
-    QMap<QString, QString> m_stagedChanges; // calId_itemId -> icalData
-};
+    QMap<QString, QList<DeltaChange>> m_deltaChanges;};
 
 #endif // SESSIONMANAGER_H

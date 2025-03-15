@@ -31,6 +31,7 @@ QList<CalendarMetadata> LocalBackend::loadCalendars(const QString &collectionId)
         calendars.append(meta);
         qDebug() << "LocalBackend: Added calendar" << meta.id << meta.name;
     }
+    qDebug() << "LocalBackend: Loaded" << calendars.size() << "calendars for collection" << collectionId;
     emit calendarsLoaded(collectionId, calendars);
     emit dataLoaded();
     return calendars;
@@ -118,6 +119,7 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
         qDebug() << "LocalBackend: Loaded" << item->type() << itemId << "from" << filePath;
     }
 
+    qDebug() << "LocalBackend: Loaded" << items.size() << "items for calendar" << cal->name();
     emit itemsLoaded(cal, items);
     emit dataLoaded();
     return items;

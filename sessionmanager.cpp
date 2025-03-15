@@ -1,68 +1,48 @@
 #include "sessionmanager.h"
+#include "collectioncontroller.h"
+#include "collection.h"
 #include "cal.h"
-#include <QFile>
+#include "calendaritem.h"
 #include <QDebug>
 
-SessionManager::SessionManager(CollectionController *collectionController, const QString &sessionPath, QObject *parent)
-    : QObject(parent), m_collectionController(collectionController), m_sessionPath(sessionPath)
+SessionManager::SessionManager(CollectionController *controller, QObject *parent)
+    : QObject(parent), m_collectionController(controller)
 {
 }
 
-void SessionManager::stageChange(const QString &calId, const QString &itemId, const QString &icalData)
+void SessionManager::queueDeltaChange(const QString &calId, const QSharedPointer<CalendarItem> &item, DeltaChange::Type change)
 {
-    QString key = calId + "_" + itemId;
-    m_stagedChanges[key] = icalData;
-    qDebug() << "SessionManager: Staged change for" << key;
+    m_deltaChanges[calId].append(DeltaChange(change, item));
 }
 
 void SessionManager::applyDeltaChanges()
 {
-    QFile deltaFile(m_sessionPath + "/.kalb.delta");
-    if (!deltaFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "SessionManager: No delta file found at" << deltaFile.fileName();
-        return;
-    }
-
-    QTextStream in(&deltaFile);
-    while (!in.atEnd()) {
-        QString line = in.readLine();
-        QStringList parts = line.split(" ");
-        if (parts.size() < 4) continue;
-
-        QString operation = parts[0];
-        QString calId = parts[1];
-        QString itemId = parts[2];
-        QString icalData = parts.mid(3).join(" ");
-
-        if (operation == "UPDATE") {
-            for (Collection *col : m_collectionController->collections()) {
-                for (Cal *cal : col->calendars()) {
-                    if (cal->id() == calId) {
-                        qDebug() << "SessionManager: Applying delta update for" << itemId;
-                        // Stubbed: apply update logic here
-                    }
-                }
+    qDebug() << "SessionManager: Applying delta changes";
+    for (const QString &calId : m_deltaChanges.keys()) {
+        Collection *col = m_collectionController->collection(calId);
+        if (!col) {
+            qDebug() << "SessionManager: Collection for calId" << calId << "not found";
+            continue;
+        }
+        Cal *cal = m_collectionController->getCal(calId);
+        if (!cal) {
+            qDebug() << "SessionManager: No calendar found for" << calId;
+            continue;
+        }
+        for (const DeltaChange &delta : m_deltaChanges[calId]) {
+            if (delta.change() == DeltaChange::Add) {
+                cal->addItem(delta.getItem());
+                qDebug() << "SessionManager: Added item" << delta.getItem()->id() << "to calendar" << calId;
+            } else if (delta.change() == DeltaChange::Modify) {
+                cal->updateItem(delta.getItem());
+                qDebug() << "SessionManager: Modified item" << delta.getItem()->id() << "in calendar" << calId;
+            } else if (delta.change() == DeltaChange::Remove) {
+                cal->removeItem(delta.getItem());
+                qDebug() << "SessionManager: Removed item" << delta.getItem()->id() << "from calendar" << calId;
             }
+            delta.getItem()->setDirty(false);
         }
     }
-    deltaFile.close();
+    m_deltaChanges.clear();
 }
 
-void SessionManager::commitChanges(SyncBackend *activeBackend, Collection *activeCollection)
-{
-    if (!activeBackend || !activeCollection) {
-        qDebug() << "SessionManager: No active backend or collection to commit";
-        return;
-    }
-
-    for (Cal *cal : activeCollection->calendars()) {
-        for (const auto &change : m_stagedChanges) {
-            QString calId = change.split("_").first();
-            if (cal->id() == calId) {
-                qDebug() << "SessionManager: Committing change for" << change;
-                // Stubbed: commit logic here
-            }
-        }
-    }
-    m_stagedChanges.clear();
-}

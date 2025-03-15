@@ -10,13 +10,14 @@ class ConfigManager : public QObject
     Q_OBJECT
 public:
     explicit ConfigManager(QObject *parent = nullptr);
-    void setBasePath(const QString &path); // New
-    void saveBackendConfig(const QString &collectionId, const QList<SyncBackend*> &backends, const QString &kalbPath = QString());
+    void setBasePath(const QString &path);
+    void saveBackendConfig(const QString &collectionId, const QString &collectionName, const QList<SyncBackend*> &backends, const QString &kalbPath = QString());
     QList<SyncBackend*> loadBackendConfig(const QString &collectionId, const QString &kalbPath = QString());
+    QVariantMap loadConfig(const QString &collectionId, const QString &kalbPath = QString()); // New method
 
 private:
     QString configPath(const QString &collectionId, const QString &kalbPath) const;
-    QString m_basePath; // New
+    QString m_basePath;
 };
 
 #endif // CONFIGMANAGER_H

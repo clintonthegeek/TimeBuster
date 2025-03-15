@@ -15,12 +15,15 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->actionAddLocalCollection, &QAction::triggered, this, &MainWindow::addLocalCollection);
     connect(ui->actionAddRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
-    connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::attachActiveToLocal); // Updated connection
+    connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::attachActiveToLocal);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
     connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
     connect(collectionController, &CollectionController::calendarsLoaded, this, &MainWindow::onCalendarsLoaded);
     connect(collectionController, &CollectionController::itemsLoaded, this, &MainWindow::onItemsLoaded);
     connect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated);
+
+    // Add Open Collection action
+    connect(ui->actionOpenCollection, &QAction::triggered, this, &MainWindow::onOpenCollection);
 
     qDebug() << "MainWindow: Initialized";
 }
@@ -50,7 +53,7 @@ void MainWindow::addLocalCollection()
 {
     qDebug() << "MainWindow: Adding local collection";
     Collection *col = new Collection("local0", "Local Collection", this);
-    collectionController->addCollection("Local Collection", new LocalBackend("/home/clinton/Sync/TimeBuster/local_storage", this));
+    collectionController->addCollection("Local Collection", new LocalBackend("local_storage", this));
     qDebug() << "MainWindow: Local collection added";
     activeCollection = col;
 }
@@ -80,11 +83,10 @@ void MainWindow::attachActiveToLocal()
         return;
     }
 
-    // Open QFileDialog to select a folder and save a .kalb file
     QString filePath = QFileDialog::getSaveFileName(
         this,
         tr("Attach Collection to Local Backend"),
-        QDir::homePath(),
+        QDir::currentPath(),
         tr("KALB Files (*.kalb)")
         );
 
@@ -94,16 +96,13 @@ void MainWindow::attachActiveToLocal()
         return;
     }
 
-    // Ensure the file has a .kalb extension
     if (!filePath.endsWith(".kalb")) {
         filePath += ".kalb";
     }
 
-    // The parent directory of the .kalb file will be the rootPath for LocalBackend
     QFileInfo fileInfo(filePath);
     QString rootPath = fileInfo.absolutePath();
 
-    // Create a minimal .kalb file (for now, just a placeholder)
     QFile kalbFile(filePath);
     if (!kalbFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
         ui->logTextEdit->append("Failed to create .kalb file: " + kalbFile.errorString());
@@ -118,10 +117,7 @@ void MainWindow::attachActiveToLocal()
 
     qDebug() << "MainWindow: Created .kalb file at" << filePath << "with rootPath" << rootPath;
 
-    // Create a LocalBackend with the selected rootPath
     LocalBackend *localBackend = new LocalBackend(rootPath, this);
-
-    // Attach the LocalBackend to the active collection via CollectionController
     collectionController->attachLocalBackend(activeCollection->id(), localBackend);
 
     ui->logTextEdit->append("Attached collection to local backend at " + rootPath);
@@ -194,5 +190,30 @@ void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
             qDebug() << "MainWindow: ActiveCal" << activeCal << "not found in m_calMap";
             activeCal = "";
         }
+    }
+}
+
+void MainWindow::onOpenCollection()
+{
+    qDebug() << "MainWindow: Opening collection";
+    QString filePath = QFileDialog::getOpenFileName(
+        this,
+        tr("Open Collection"),
+        QDir::currentPath(),
+        tr("KALB Files (*.kalb)")
+        );
+
+    if (filePath.isEmpty()) {
+        ui->logTextEdit->append("Open collection canceled");
+        qDebug() << "MainWindow: Open collection canceled by user";
+        return;
+    }
+
+    if (collectionController->loadCollection(filePath)) {
+        ui->logTextEdit->append("Collection loaded from " + filePath);
+        qDebug() << "MainWindow: Collection loaded successfully from" << filePath;
+    } else {
+        ui->logTextEdit->append("Failed to load collection from " + filePath);
+        qDebug() << "MainWindow: Failed to load collection from" << filePath;
     }
 }

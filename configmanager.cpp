@@ -24,10 +24,18 @@ QString ConfigManager::configPath(const QString &collectionId, const QString &ka
     return dir.filePath(collectionId + ".kalb");
 }
 
-void ConfigManager::saveBackendConfig(const QString &collectionId, const QList<SyncBackend*> &backends, const QString &kalbPath)
+void ConfigManager::saveBackendConfig(const QString &collectionId, const QString &collectionName, const QList<SyncBackend*> &backends, const QString &kalbPath)
 {
     QSettings settings(configPath(collectionId, kalbPath), QSettings::IniFormat);
     settings.clear();
+
+    // Save collection metadata
+    settings.beginGroup("Collection");
+    settings.setValue("id", collectionId);
+    settings.setValue("name", collectionName);
+    settings.endGroup();
+
+    // Save backend configurations
     settings.beginWriteArray("backends");
     for (int i = 0; i < backends.size(); ++i) {
         settings.setArrayIndex(i);
@@ -65,4 +73,37 @@ QList<SyncBackend*> ConfigManager::loadBackendConfig(const QString &collectionId
     }
     settings.endArray();
     return backends;
+}
+
+QVariantMap ConfigManager::loadConfig(const QString &collectionId, const QString &kalbPath)
+{
+    QVariantMap config;
+    QSettings settings(ConfigManager::configPath(collectionId, kalbPath), QSettings::IniFormat);
+
+    // Load collection metadata
+    settings.beginGroup("Collection");
+    config["id"] = settings.value("id", "").toString();
+    config["name"] = settings.value("name", "").toString();
+    settings.endGroup();
+
+    // Load backend configurations into a list of QVariantMaps
+    QVariantList backendsList;
+    int size = settings.beginReadArray("backends");
+    for (int i = 0; i < size; ++i) {
+        settings.setArrayIndex(i);
+        QVariantMap backend;
+        backend["type"] = settings.value("type").toString();
+        if (backend["type"].toString() == "local") {
+            backend["rootPath"] = settings.value("rootPath", "").toString();
+        } else if (backend["type"].toString() == "caldav") {
+            backend["serverUrl"] = settings.value("serverUrl", "").toString();
+            backend["username"] = settings.value("username", "").toString();
+            backend["password"] = settings.value("password", "").toString();
+        }
+        backendsList.append(backend);
+    }
+    settings.endArray();
+    config["backends"] = backendsList;
+
+    return config;
 }

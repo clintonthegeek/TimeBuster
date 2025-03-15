@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 project(TimeBuster LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Sql)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Sql Test)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOUIC ON)
@@ -12,9 +12,7 @@ find_package(KF6CalendarCore REQUIRED)
 find_package(KF6DAV REQUIRED)
 find_package(KF6CoreAddons REQUIRED)
 
-qt_add_executable(TimeBuster
-    WIN32 MACOSX_BUNDLE
-    main.cpp
+add_library(TimeBusterCore SHARED
     mainwindow.cpp
     mainwindow.h
     mainwindow.ui
@@ -33,16 +31,33 @@ qt_add_executable(TimeBuster
     sessionmanager.h sessionmanager.cpp
     calendaritemfactory.h calendaritemfactory.cpp
     DatabaseManager.h
+    deltachange.h
+)
+
+target_link_libraries(TimeBusterCore
+    PRIVATE
+    Qt::Core
+    Qt::Widgets
+    Qt::Sql
+    KF6::CalendarCore
+    KF6::DAV
+    KF6::CoreAddons)
+
+qt_add_executable(TimeBuster
+    WIN32 MACOSX_BUNDLE
+    main.cpp
+
 )
 
 target_link_libraries(TimeBuster
     PRIVATE
-        Qt::Core
-        Qt::Widgets
-        Qt::Sql
-        KF6::CalendarCore
-        KF6::DAV
-        KF6::CoreAddons
+    Qt::Core
+    Qt::Widgets
+    Qt::Sql
+    KF6::CalendarCore
+    KF6::DAV
+    KF6::CoreAddons
+    TimeBusterCore
 )
 
 target_include_directories(TimeBuster PRIVATE ${KF6CalendarCore_INCLUDE_DIRS})
@@ -50,6 +65,12 @@ target_include_directories(TimeBuster PRIVATE ${KF6CalendarCore_INCLUDE_DIRS})
 target_include_directories(TimeBuster PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 include(GNUInstallDirs)
+
+# Enable testing
+enable_testing()
+
+# Add tests subdirectory
+add_subdirectory(tests)
 
 install(TARGETS TimeBuster
     BUNDLE  DESTINATION .
