@@ -4,6 +4,7 @@
 #include "collectioncontroller.h"
 #include "localbackend.h"
 #include "caldavbackend.h"
+#include "configmanager.h" // Add this include to access ConfigManager
 #include <QDebug>
 #include <QFileDialog>
 
@@ -85,14 +86,14 @@ void MainWindow::attachActiveToLocal()
 
     QString filePath = QFileDialog::getSaveFileName(
         this,
-        tr("Attach Collection to Local Backend"),
+        tr("Create Local From Remote"),
         QDir::currentPath(),
         tr("KALB Files (*.kalb)")
         );
 
     if (filePath.isEmpty()) {
-        ui->logTextEdit->append("Attach to local canceled");
-        qDebug() << "MainWindow: Attach to local canceled by user";
+        ui->logTextEdit->append("Create Local From Remote canceled");
+        qDebug() << "MainWindow: Create Local From Remote canceled by user";
         return;
     }
 
@@ -103,26 +104,29 @@ void MainWindow::attachActiveToLocal()
     QFileInfo fileInfo(filePath);
     QString rootPath = fileInfo.absolutePath();
 
-    QFile kalbFile(filePath);
-    if (!kalbFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        ui->logTextEdit->append("Failed to create .kalb file: " + kalbFile.errorString());
-        qDebug() << "MainWindow: Failed to create .kalb file:" << kalbFile.errorString();
-        return;
-    }
-    QTextStream out(&kalbFile);
-    out << "[Collection]\n";
-    out << "id=" << activeCollection->id() << "\n";
-    out << "name=" << activeCollection->name() << "\n";
-    kalbFile.close();
-
-    qDebug() << "MainWindow: Created .kalb file at" << filePath << "with rootPath" << rootPath;
-
+    // Create a new LocalBackend
     LocalBackend *localBackend = new LocalBackend(rootPath, this);
     collectionController->attachLocalBackend(activeCollection->id(), localBackend);
 
-    ui->logTextEdit->append("Attached collection to local backend at " + rootPath);
-    qDebug() << "MainWindow: Attached LocalBackend to collection" << activeCollection->id();
+    // Get the list of backends for the collection from CollectionController
+    const auto backends = collectionController->backends().value(activeCollection->id());
+    if (backends.isEmpty()) {
+        ui->logTextEdit->append("No backends found for collection");
+        qDebug() << "MainWindow: No backends found for collection" << activeCollection->id();
+        return;
+    }
+
+    // Use ConfigManager to save the collection configuration with all backends
+    ConfigManager configManager(this);
+    if (configManager.saveBackendConfig(activeCollection->id(), activeCollection->name(), backends, filePath)) {
+        ui->logTextEdit->append("Created Local From Remote and saved to " + filePath + " at " + rootPath);
+        qDebug() << "MainWindow: Saved collection" << activeCollection->id() << "with backends to" << filePath;
+    } else {
+        ui->logTextEdit->append("Failed to save collection to " + filePath);
+        qDebug() << "MainWindow: Failed to save collection" << activeCollection->id() << "to" << filePath;
+    }
 }
+
 
 void MainWindow::syncCollections()
 {

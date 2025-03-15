@@ -11,7 +11,7 @@ class ConfigManager : public QObject
 public:
     explicit ConfigManager(QObject *parent = nullptr);
     void setBasePath(const QString &path);
-    void saveBackendConfig(const QString &collectionId, const QString &collectionName, const QList<SyncBackend*> &backends, const QString &kalbPath = QString());
+    bool saveBackendConfig(const QString &collectionId, const QString &collectionName, const QList<SyncBackend*> &backends, const QString &kalbPath = QString());
     QList<SyncBackend*> loadBackendConfig(const QString &collectionId, const QString &kalbPath = QString());
     QVariantMap loadConfig(const QString &collectionId, const QString &kalbPath = QString()); // New method
 
