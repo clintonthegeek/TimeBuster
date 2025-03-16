@@ -23,6 +23,8 @@ public:
     void storeItems(Cal *cal, const QList<QSharedPointer<CalendarItem>> &items) override;
     void updateItem(const QString &calId, const QString &itemId, const QString &icalData) override;
 
+    void startSync(const QString &collectionId) override;
+
     QString serverUrl() const { return m_serverUrl; }
     QString username() const { return m_username; }
     QString password() const { return m_password; }

@@ -231,3 +231,10 @@ void CalDAVBackend::updateItem(const QString &calId, const QString &itemId, cons
     qDebug() << "CalDAVBackend: updateItem stub for" << calId << "item" << itemId;
     emit errorOccurred("Update not implemented for CalDAVBackend");
 }
+
+void CalDAVBackend::startSync(const QString &collectionId)
+{
+    qDebug() << "CalDAVBackend: Stub startSync for" << collectionId;
+    // Stub for Stage 1—full impl in Stage 2
+    emit syncCompleted(collectionId);
+}

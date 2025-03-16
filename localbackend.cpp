@@ -125,6 +125,25 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
     return items;
 }
 
+void LocalBackend::startSync(const QString &collectionId)
+{
+    qDebug() << "LocalBackend: Starting sync for collection" << collectionId;
+
+    // Load calendars
+    QList<CalendarMetadata> calendars = loadCalendars(collectionId); // Uses existing method
+    for (const CalendarMetadata &meta : calendars) {
+        emit calendarDiscovered(collectionId, meta);
+        Cal *cal = new Cal(meta.id, meta.name, nullptr); // Temp for loading
+        QList<QSharedPointer<CalendarItem>> items = loadItems(cal); // Uses existing method
+        for (const QSharedPointer<CalendarItem> &item : items) {
+            emit itemLoaded(cal, item);
+        }
+        emit calendarLoaded(cal);
+    }
+
+    emit syncCompleted(collectionId);
+}
+
 void LocalBackend::storeCalendars(const QString &collectionId, const QList<Cal*> &calendars)
 {
     qDebug() << "LocalBackend: Storing calendars for collection" << collectionId << "with" << calendars.size() << "calendars";

@@ -20,9 +20,11 @@ public:
     void storeItems(Cal *cal, const QList<QSharedPointer<CalendarItem>> &items) override;
     void updateItem(const QString &calId, const QString &itemId, const QString &icalData) override;
 
+    void startSync(const QString &collectionId) override;
+
 private:
     QString m_rootPath;
-    QMap<QString, QString> m_idToPath; // Maps calId_itemUid to file path
+    QMap<QString, QString> m_idToPath; // Retained for storage/update
 };
 
 #endif // LOCALBACKEND_H

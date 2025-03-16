@@ -30,11 +30,19 @@ signals:
     void collectionAdded(Collection *collection);
     void calendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars);
     void itemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items);
+    void calendarAdded(Cal *cal);
+    void itemAdded(Cal *cal, QSharedPointer<CalendarItem> item);
+    void calendarLoaded(Cal *cal);
+    void loadingProgress(int progress);
 
 private slots:
     void onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars);
     void onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items);
     void onDataLoaded();
+    void onCalendarDiscovered(const QString &collectionId, const CalendarMetadata &calendar);
+    void onItemLoaded(Cal *cal, QSharedPointer<CalendarItem> item);
+    void onCalendarLoaded(Cal *cal);
+    void onSyncCompleted(const QString &collectionId);
 
 private:
     struct BackendInfo {
@@ -46,7 +54,8 @@ private:
     QMap<QString, Collection*> m_collections;
     QMap<QString, QList<BackendInfo>> m_backends;
     QMap<QString, Cal*> m_calMap;
-    QMap<QString, int> m_pendingDataLoads; // Counts calendar loads only
+    QMap<QString, int> m_pendingDataLoads;
+    QMap<QString, int> m_pendingSyncs; // For new sync flow
     int m_collectionCounter;
 };
 

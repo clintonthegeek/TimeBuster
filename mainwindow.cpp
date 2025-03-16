@@ -29,6 +29,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionNewRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
     connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
+    connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
+    connect(collectionController, &CollectionController::calendarAdded, this, &MainWindow::addCalendarView);
     connect(collectionController, &CollectionController::calendarsLoaded, this, &MainWindow::onCalendarsLoaded);
     connect(collectionController, &CollectionController::itemsLoaded, this, &MainWindow::onItemsLoaded);
     connect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated);
@@ -121,6 +123,25 @@ void MainWindow::addLocalBackend()
 void MainWindow::syncCollections()
 {
     ui->logTextEdit->append("Sync Collections triggered (stub)");
+}
+
+void MainWindow::onItemAdded(Cal *cal, QSharedPointer<CalendarItem> item)
+{
+    Q_UNUSED(item);
+    for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
+        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+            if (view->model()->id() == cal->id()) {
+                view->refresh(); // Static for Stage 1, live in Stage 2
+                qDebug() << "MainWindow: Item added to" << cal->id();
+                break;
+            }
+        }
+    }
+}
+
+void MainWindow::onCalendarLoaded(Cal *cal)
+{
+    qDebug() << "MainWindow: Calendar loaded:" << cal->id();
 }
 
 void MainWindow::onCollectionAdded(Collection *collection)

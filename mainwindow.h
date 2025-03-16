@@ -30,6 +30,8 @@ private slots:
     void syncCollections();
     void onCollectionAdded(Collection *collection);
     void onOpenCollection(); // New slot
+    void onItemAdded(Cal *cal, QSharedPointer<CalendarItem> item);
+    void onCalendarLoaded(Cal *cal);
 
 private:
     void addCalendarView(Cal *cal);
