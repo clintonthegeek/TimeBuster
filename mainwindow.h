@@ -26,7 +26,7 @@ public:
 private slots:
     void addLocalCollection();
     void addRemoteCollection();
-    void attachActiveToLocal();
+    void addLocalBackend(); // Renamed from attachActiveToLocal()
     void syncCollections();
     void onCollectionAdded(Collection *collection);
     void onOpenCollection(); // New slot

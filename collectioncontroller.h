@@ -37,7 +37,6 @@ private slots:
     void onDataLoaded();
 
 private:
-    // Struct to track backend metadata
     struct BackendInfo {
         SyncBackend *backend;
         int priority;
@@ -45,8 +44,9 @@ private:
     };
 
     QMap<QString, Collection*> m_collections;
-    QMap<QString, QList<BackendInfo>> m_backends; // Now stores BackendInfo instead of raw SyncBackend*
+    QMap<QString, QList<BackendInfo>> m_backends;
     QMap<QString, Cal*> m_calMap;
+    QMap<QString, int> m_pendingDataLoads; // Counts calendar loads only
     int m_collectionCounter;
 };
 

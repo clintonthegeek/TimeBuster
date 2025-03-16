@@ -4,9 +4,11 @@
 #include "collectioncontroller.h"
 #include "localbackend.h"
 #include "caldavbackend.h"
-#include "configmanager.h" // Add this include to access ConfigManager
+#include "configmanager.h"
 #include <QDebug>
 #include <QFileDialog>
+#include <QMenu>
+#include <QProgressBar>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), credentialsDialog(new CredentialsDialog(this)),
@@ -14,17 +16,31 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    connect(ui->actionAddLocalCollection, &QAction::triggered, this, &MainWindow::addLocalCollection);
-    connect(ui->actionAddRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
-    connect(ui->actionCreateLocalFromRemote, &QAction::triggered, this, &MainWindow::attachActiveToLocal);
+    // Status bar setup (adding as per previous discussion)
+    QLabel *statusLabel = new QLabel("Ready", this);
+    QProgressBar *totalProgressBar = new QProgressBar(this);
+    QProgressBar *currentProgressBar = new QProgressBar(this);
+    ui->statusBar->addWidget(statusLabel, 1);
+    ui->statusBar->addPermanentWidget(totalProgressBar);
+    ui->statusBar->addPermanentWidget(currentProgressBar);
+
+    // Connect menu actions
+    connect(ui->actionNewLocalCollection, &QAction::triggered, this, &MainWindow::addLocalCollection);
+    connect(ui->actionNewRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
     connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
     connect(collectionController, &CollectionController::calendarsLoaded, this, &MainWindow::onCalendarsLoaded);
     connect(collectionController, &CollectionController::itemsLoaded, this, &MainWindow::onItemsLoaded);
     connect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated);
-
-    // Add Open Collection action
     connect(ui->actionOpenCollection, &QAction::triggered, this, &MainWindow::onOpenCollection);
+
+    // Setup Add Backend submenu
+    QMenu *addBackendMenu = new QMenu(this);
+    QAction *addLocalAction = addBackendMenu->addAction("🚧 Add &Local");
+    QAction *addRemoteAction = addBackendMenu->addAction("Add &Remote");
+    ui->actionAddBackend->setMenu(addBackendMenu);
+    connect(addLocalAction, &QAction::triggered, this, &MainWindow::addLocalBackend);
+    // addRemoteAction left unconnected for now (future 🚧)
 
     qDebug() << "MainWindow: Initialized";
 }
@@ -53,8 +69,13 @@ void MainWindow::addCalendarView(Cal *cal)
 void MainWindow::addLocalCollection()
 {
     qDebug() << "MainWindow: Adding local collection";
-    Collection *col = new Collection("local0", "Local Collection", this);
-    collectionController->addCollection("Local Collection", new LocalBackend("local_storage", this));
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Select Local Collection Directory"));
+    if (dir.isEmpty()) {
+        ui->logTextEdit->append("Local collection creation canceled");
+        return;
+    }
+    Collection *col = new Collection("local0", "Local Collection", this); // ID will be set by controller
+    collectionController->addCollection("Local Collection", new LocalBackend(dir, this));
     qDebug() << "MainWindow: Local collection added";
     activeCollection = col;
 }
@@ -76,57 +97,26 @@ void MainWindow::addRemoteCollection()
     }
 }
 
-void MainWindow::attachActiveToLocal()
+void MainWindow::addLocalBackend()
 {
     if (!activeCollection) {
-        ui->logTextEdit->append("No active collection to attach");
-        qDebug() << "MainWindow: No active collection for attachActiveToLocal";
+        ui->logTextEdit->append("No active collection to attach a backend to");
+        qDebug() << "MainWindow: No active collection for addLocalBackend";
         return;
     }
 
-    QString filePath = QFileDialog::getSaveFileName(
-        this,
-        tr("Create Local From Remote"),
-        QDir::currentPath(),
-        tr("KALB Files (*.kalb)")
-        );
-
-    if (filePath.isEmpty()) {
-        ui->logTextEdit->append("Create Local From Remote canceled");
-        qDebug() << "MainWindow: Create Local From Remote canceled by user";
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Select Local Backend Directory"));
+    if (dir.isEmpty()) {
+        ui->logTextEdit->append("Add Local Backend canceled");
+        qDebug() << "MainWindow: Add Local Backend canceled by user";
         return;
     }
 
-    if (!filePath.endsWith(".kalb")) {
-        filePath += ".kalb";
-    }
-
-    QFileInfo fileInfo(filePath);
-    QString rootPath = fileInfo.absolutePath();
-
-    // Create a new LocalBackend
-    LocalBackend *localBackend = new LocalBackend(rootPath, this);
+    LocalBackend *localBackend = new LocalBackend(dir, this);
     collectionController->attachLocalBackend(activeCollection->id(), localBackend);
-
-    // Get the list of backends for the collection from CollectionController
-    const auto backends = collectionController->backends().value(activeCollection->id());
-    if (backends.isEmpty()) {
-        ui->logTextEdit->append("No backends found for collection");
-        qDebug() << "MainWindow: No backends found for collection" << activeCollection->id();
-        return;
-    }
-
-    // Use ConfigManager to save the collection configuration with all backends
-    ConfigManager configManager(this);
-    if (configManager.saveBackendConfig(activeCollection->id(), activeCollection->name(), backends, filePath)) {
-        ui->logTextEdit->append("Created Local From Remote and saved to " + filePath + " at " + rootPath);
-        qDebug() << "MainWindow: Saved collection" << activeCollection->id() << "with backends to" << filePath;
-    } else {
-        ui->logTextEdit->append("Failed to save collection to " + filePath);
-        qDebug() << "MainWindow: Failed to save collection" << activeCollection->id() << "to" << filePath;
-    }
+    ui->logTextEdit->append("Attached local backend at " + dir + " to collection " + activeCollection->name());
+    qDebug() << "MainWindow: Attached LocalBackend to" << activeCollection->id() << "at" << dir;
 }
-
 
 void MainWindow::syncCollections()
 {
@@ -168,11 +158,12 @@ void MainWindow::onCalendarsLoaded(const QString &collectionId, const QList<Cale
 void MainWindow::onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items)
 {
     Q_UNUSED(items);
+    qDebug() << "MainWindow: onItemsLoaded for" << cal->id() << "with" << items.size() << "items";
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
             if (view->model()->id() == cal->id()) {
                 view->refresh();
-                break;
+                qDebug() << "MainWindow: Refreshed view for" << cal->name();
             }
         }
     }
@@ -192,7 +183,7 @@ void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
             qDebug() << "MainWindow: Focused on" << activeCal;
         } else {
             qDebug() << "MainWindow: ActiveCal" << activeCal << "not found in m_calMap";
-            activeCal = "";
+            // Don’t clear activeCal here—m_calMap should be reliable now
         }
     }
 }

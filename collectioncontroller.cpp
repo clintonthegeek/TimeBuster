@@ -40,8 +40,8 @@ void CollectionController::addCollection(const QString &name, SyncBackend *initi
     if (initialBackend) {
         BackendInfo info;
         info.backend = initialBackend;
-        info.priority = 1; // Default priority
-        info.syncOnOpen = false; // Default no sync
+        info.priority = 1;
+        info.syncOnOpen = false;
         m_backends[id].append(info);
         initialBackend->setParent(this);
         connect(initialBackend, &SyncBackend::calendarsLoaded, this, &CollectionController::onCalendarsLoaded);
@@ -51,15 +51,11 @@ void CollectionController::addCollection(const QString &name, SyncBackend *initi
             qDebug() << "CollectionController: Error from backend:" << error;
         });
 
-        // Save the initial backend configuration
         ConfigManager configManager(this);
         configManager.saveBackendConfig(id, name, {initialBackend});
 
+        m_pendingDataLoads[id] = 1;
         initialBackend->loadCalendars(id);
-    }
-
-    for (Cal *cal : col->calendars()) {
-        m_calMap[cal->id()] = cal;
     }
 
     emit collectionAdded(col);
@@ -135,7 +131,6 @@ bool CollectionController::loadCollection(const QString &kalbPath)
     QString collectionName = config.value("name").toString();
     qDebug() << "CollectionController: Parsed collection id:" << collectionId << "name:" << collectionName;
 
-    // Process backends
     QVariantList backendsList = config.value("backends").toList();
     qDebug() << "CollectionController: Found" << backendsList.size() << "backends in config";
     QList<BackendInfo> backends;
@@ -170,7 +165,6 @@ bool CollectionController::loadCollection(const QString &kalbPath)
         return false;
     }
 
-    // Sort backends by priority (ascending order: lower priority value = higher precedence)
     std::sort(backends.begin(), backends.end(), [](const BackendInfo &a, const BackendInfo &b) {
         return a.priority < b.priority;
     });
@@ -179,7 +173,6 @@ bool CollectionController::loadCollection(const QString &kalbPath)
     m_collections.insert(collectionId, collection);
     m_backends.insert(collectionId, backends);
 
-    // Connect signals for all backends
     for (BackendInfo &info : backends) {
         SyncBackend *backend = info.backend;
         connect(backend, &SyncBackend::calendarsLoaded, this, &CollectionController::onCalendarsLoaded);
@@ -190,27 +183,46 @@ bool CollectionController::loadCollection(const QString &kalbPath)
         });
     }
 
-    // Load calendars based on priority and SyncOnOpen
-    bool loaded = false;
+    int loadCount = 0;
     for (BackendInfo &info : backends) {
-        bool isLocalBackend = dynamic_cast<LocalBackend*>(info.backend) != nullptr;
-        if (isLocalBackend || info.syncOnOpen) {
-            qDebug() << "CollectionController: Loading calendars from backend with priority" << info.priority << "syncOnOpen:" << info.syncOnOpen;
+        if (info.syncOnOpen) {
+            qDebug() << "CollectionController: Loading calendars from backend with priority" << info.priority;
             info.backend->loadCalendars(collectionId);
-            loaded = true;
-        } else {
-            qDebug() << "CollectionController: Skipping load from backend with priority" << info.priority << "syncOnOpen:" << info.syncOnOpen;
+            loadCount++;
         }
     }
+    m_pendingDataLoads[collectionId] = loadCount > 0 ? loadCount : 1;
+    emit collectionAdded(collection);
 
-    if (!loaded) {
-        qDebug() << "CollectionController: No backends were loaded (none had SyncOnOpen=true and no LocalBackend present)";
-        return false;
-    }
-
-    qDebug() << "CollectionController: Backends for collection" << collectionId << ":" << m_backends.value(collectionId).size();
-    qDebug() << "CollectionController: Loaded collection" << collectionId << "with" << collection->calendars().size() << "calendars";
     return true;
+}
+
+
+void CollectionController::onDataLoaded()
+{
+    qDebug() << "CollectionController: Data loaded from backend";
+    QList<QString> collectionIds = m_pendingDataLoads.keys(); // Copy keys to avoid modification issues
+    for (const QString &collectionId : collectionIds) {
+        m_pendingDataLoads[collectionId]--;
+        qDebug() << "CollectionController: Pending loads for" << collectionId << "now" << m_pendingDataLoads[collectionId];
+        if (m_pendingDataLoads[collectionId] <= 0) {
+            Collection *col = m_collections.value(collectionId);
+            if (!col) {
+                qDebug() << "CollectionController: No collection found for" << collectionId;
+                continue;
+            }
+            qDebug() << "CollectionController: All calendars loaded for" << collectionId << ", loading items";
+            for (Cal *cal : col->calendars()) {
+                for (const BackendInfo &info : m_backends[collectionId]) {
+                    if (info.syncOnOpen || dynamic_cast<LocalBackend*>(info.backend)) {
+                        qDebug() << "CollectionController: Loading items for" << cal->id();
+                        info.backend->loadItems(cal);
+                    }
+                }
+            }
+            m_pendingDataLoads.remove(collectionId); // Done with this collection
+        }
+    }
 }
 
 bool CollectionController::saveCollection(const QString &kalbPath, const QString &collectionId)
@@ -242,7 +254,6 @@ void CollectionController::onCalendarsLoaded(const QString &collectionId, const 
         return;
     }
 
-    // Only add calendars if they haven't been added yet
     QSet<QString> existingCalIds;
     for (Cal *cal : col->calendars()) {
         existingCalIds.insert(cal->id());
@@ -255,29 +266,19 @@ void CollectionController::onCalendarsLoaded(const QString &collectionId, const 
         }
     }
 
-    emit calendarsLoaded(collectionId, calendars);
-
-    // Load items only for calendars that haven't had items loaded yet
+    // Update m_calMap here too, since onCollectionAdded needs it
+    m_calMap.clear();
     for (Cal *cal : col->calendars()) {
-        if (cal->items().isEmpty()) { // Only load items if not already loaded
-            for (const BackendInfo &info : m_backends[collectionId]) {
-                bool isLocalBackend = dynamic_cast<LocalBackend*>(info.backend) != nullptr;
-                if (isLocalBackend || info.syncOnOpen) {
-                    qDebug() << "CollectionController: Triggering loadItems for" << cal->id() << "from backend with priority" << info.priority;
-                    info.backend->loadItems(cal);
-                }
-            }
-        } else {
-            qDebug() << "CollectionController: Skipping loadItems for" << cal->id() << "(items already loaded)";
-        }
+        m_calMap[cal->id()] = cal;
     }
+
+    emit calendarsLoaded(collectionId, calendars);
 }
 
 void CollectionController::onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items)
 {
     qDebug() << "CollectionController: Received itemsLoaded for" << cal->id() << "with" << items.size() << "items";
 
-    // Add items, avoiding duplicates
     QSet<QString> existingItemIds;
     for (const QSharedPointer<CalendarItem> &item : cal->items()) {
         existingItemIds.insert(item->id());
@@ -293,7 +294,3 @@ void CollectionController::onItemsLoaded(Cal *cal, QList<QSharedPointer<Calendar
     emit itemsLoaded(cal, cal->items());
 }
 
-void CollectionController::onDataLoaded()
-{
-    qDebug() << "CollectionController: Data loaded from backend";
-}

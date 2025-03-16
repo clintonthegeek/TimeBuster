@@ -6,14 +6,150 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>1000</width>
+    <height>700</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Calendar IDE</string>
+   <string>TimeBuster</string>
   </property>
-  <widget class="QMdiArea" name="mdiArea"/>
+
+  <!-- Central Widget: Splitter with Properties, MDI, Edit -->
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="centralLayout">
+    <item>
+     <widget class="QSplitter" name="mainSplitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <!-- Properties Pane -->
+      <widget class="QWidget" name="propertiesPane">
+       <property name="minimumWidth">
+        <number>200</number>
+       </property>
+       <property name="maximumWidth">
+        <number>400</number>
+       </property>
+       <layout class="QVBoxLayout" name="propertiesLayout">
+        <item>
+         <widget class="QTreeView" name="collectionTree">
+          <property name="headerHidden">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="propertiesDetails">
+          <layout class="QFormLayout" name="propertiesForm">
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelPath">
+             <property name="text">
+              <string>Path:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLabel" name="valuePath">
+             <property name="text">
+              <string>(none)</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <!-- MDI Area -->
+      <widget class="QMdiArea" name="mdiArea">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+         <horstretch>1</horstretch>
+         <verstretch>1</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumWidth">
+        <number>300</number>
+       </property>
+      </widget>
+      <!-- Edit Pane -->
+      <widget class="QWidget" name="editPane">
+       <property name="minimumWidth">
+        <number>250</number>
+       </property>
+       <property name="maximumWidth">
+        <number>400</number>
+       </property>
+       <layout class="QVBoxLayout" name="editLayout">
+        <item>
+         <widget class="QWidget" name="editFormWidget">
+          <layout class="QFormLayout" name="editForm">
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelSummary">
+             <property name="text">
+              <string>Summary:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLineEdit" name="summaryEdit"/>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="labelStart">
+             <property name="text">
+              <string>Start:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QDateTimeEdit" name="startEdit"/>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="labelEnd">
+             <property name="text">
+              <string>End/Due:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QDateTimeEdit" name="endEdit"/>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="editButtonsLayout">
+          <item>
+           <widget class="QPushButton" name="applyButton">
+            <property name="text">
+             <string>Apply</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="cancelButton">
+            <property name="text">
+             <string>Cancel</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+
+  <!-- Status Bar -->
+  <widget class="QStatusBar" name="statusBar">
+   <property name="sizeGripEnabled">
+    <bool>true</bool>
+   </property>
+  </widget>
+
+  <!-- Log Dock -->
   <widget class="QDockWidget" name="logDock">
    <property name="windowTitle">
     <string>Log</string>
@@ -23,12 +159,14 @@
    </attribute>
    <widget class="QTextEdit" name="logTextEdit"/>
   </widget>
+
+  <!-- Menu Bar -->
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>1000</width>
      <height>30</height>
     </rect>
    </property>
@@ -36,19 +174,43 @@
     <property name="title">
      <string>&amp;File</string>
     </property>
+    <addaction name="actionNewLocalCollection"/>
+    <addaction name="actionNewRemoteCollection"/>
+    <addaction name="separator"/>
     <addaction name="actionOpenCollection"/>
-    <addaction name="actionCreateLocalFromRemote"/>
+    <addaction name="actionSaveCollection"/>
+    <addaction name="actionSaveCollectionAs"/>
     <addaction name="separator"/>
-    <addaction name="separator"/>
-    <addaction name="actionAddLocalCollection"/>
-    <addaction name="actionAddRemoteCollection"/>
-    <addaction name="separator"/>
-    <addaction name="separator"/>
-    <addaction name="actionEditItem"/>
-    <addaction name="actionOpenLocal"/>
-    <addaction name="actionSaveChanges"/>
+    <addaction name="actionAddBackend"/>
+    <addaction name="actionExportCalendars"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>&amp;Edit</string>
+    </property>
+    <addaction name="actionNewCalendar"/>
+    <addaction name="actionEditCalendar"/>
+    <addaction name="actionDeleteCalendar"/>
+    <addaction name="separator"/>
+    <addaction name="actionNewEvent"/>
+    <addaction name="actionNewTodo"/>
+    <addaction name="actionNewJournal"/>
+    <addaction name="actionEditSelectedItem"/>
+    <addaction name="actionDeleteSelectedItem"/>
+    <addaction name="separator"/>
+    <addaction name="actionCommitChanges"/>
+    <addaction name="actionDiscardChanges"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>&amp;View</string>
+    </property>
+    <addaction name="actionShowPropertiesPane"/>
+    <addaction name="actionShowEditPane"/>
+    <addaction name="actionShowPendingChanges"/>
+    <addaction name="actionRefresh"/>
    </widget>
    <widget class="QMenu" name="menuSync">
     <property name="title">
@@ -57,21 +219,45 @@
     <addaction name="actionSyncCollections"/>
    </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
+   <addaction name="menuView"/>
    <addaction name="menuSync"/>
   </widget>
-  <action name="actionAddLocalCollection">
+
+  <!-- Actions -->
+  <action name="actionNewLocalCollection">
    <property name="text">
-    <string>Add &amp;Local Collection</string>
+    <string>New &amp;Local Collection</string>
    </property>
   </action>
-  <action name="actionAddRemoteCollection">
+  <action name="actionNewRemoteCollection">
    <property name="text">
-    <string>Add &amp;Remote Collection</string>
+    <string>New &amp;Remote Collection</string>
    </property>
   </action>
-  <action name="actionCreateLocalFromRemote">
+  <action name="actionOpenCollection">
    <property name="text">
-    <string>&amp;Create Local from Remote</string>
+    <string>&amp;Open Collection</string>
+   </property>
+  </action>
+  <action name="actionSaveCollection">
+   <property name="text">
+    <string>&amp;Save Collection</string>
+   </property>
+  </action>
+  <action name="actionSaveCollectionAs">
+   <property name="text">
+    <string>Save Collection &amp;As</string>
+   </property>
+  </action>
+  <action name="actionAddBackend">
+   <property name="text">
+    <string>Add &amp;Backend</string>
+   </property>
+  </action>
+  <action name="actionExportCalendars">
+   <property name="text">
+    <string>🚧 E&amp;xport Calendars</string>
    </property>
   </action>
   <action name="actionExit">
@@ -79,49 +265,104 @@
     <string>E&amp;xit</string>
    </property>
   </action>
+  <action name="actionNewCalendar">
+   <property name="text">
+    <string>New &amp;Calendar</string>
+   </property>
+  </action>
+  <action name="actionEditCalendar">
+   <property name="text">
+    <string>Edit Ca&amp;lendar</string>
+   </property>
+  </action>
+  <action name="actionDeleteCalendar">
+   <property name="text">
+    <string>&amp;Delete Calendar</string>
+   </property>
+  </action>
+  <action name="actionNewEvent">
+   <property name="text">
+    <string>New &amp;Event</string>
+   </property>
+  </action>
+  <action name="actionNewTodo">
+   <property name="text">
+    <string>New &amp;Todo</string>
+   </property>
+  </action>
+  <action name="actionNewJournal">
+   <property name="text">
+    <string>🚧 New &amp;Journal</string>
+   </property>
+  </action>
+  <action name="actionEditSelectedItem">
+   <property name="text">
+    <string>Edit Selected &amp;Item</string>
+   </property>
+  </action>
+  <action name="actionDeleteSelectedItem">
+   <property name="text">
+    <string>D&amp;elete Selected Item</string>
+   </property>
+  </action>
+  <action name="actionCommitChanges">
+   <property name="text">
+    <string>&amp;Commit Changes</string>
+   </property>
+  </action>
+  <action name="actionDiscardChanges">
+   <property name="text">
+    <string>🚧 Dis&amp;card Changes</string>
+   </property>
+  </action>
+  <action name="actionShowPropertiesPane">
+   <property name="text">
+    <string>Show &amp;Properties Pane</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+  </action>
+  <action name="actionShowEditPane">
+   <property name="text">
+    <string>Show &amp;Edit Pane</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+  </action>
+  <action name="actionShowPendingChanges">
+   <property name="text">
+    <string>🚧 Show Pe&amp;nding Changes</string>
+   </property>
+  </action>
+  <action name="actionRefresh">
+   <property name="text">
+    <string>&amp;Refresh</string>
+   </property>
+  </action>
   <action name="actionSyncCollections">
    <property name="text">
-    <string>&amp;Sync Collections</string>
-   </property>
-  </action>
-  <action name="actionOpenLocal">
-   <property name="text">
-    <string>Open Local (deprc)</string>
-   </property>
-  </action>
-  <action name="actionEditItem">
-   <property name="text">
-    <string>&amp;Edit Item</string>
-   </property>
-  </action>
-  <action name="actionSaveChanges">
-   <property name="text">
-    <string>Save Changes</string>
-   </property>
-  </action>
-  <action name="actionOpenCollection">
-   <property name="text">
-    <string>Open Collection</string>
+    <string>🚧 &amp;Sync Collections</string>
    </property>
   </action>
  </widget>
- <resources/>
+
+ <!-- Connections -->
  <connections>
   <connection>
    <sender>actionExit</sender>
    <signal>triggered()</signal>
    <receiver>MainWindow</receiver>
    <slot>close()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>-1</x>
-     <y>-1</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
-    </hint>
-   </hints>
   </connection>
  </connections>
+
+ <resources/>
 </ui>
