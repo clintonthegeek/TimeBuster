@@ -48,6 +48,9 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    qDebug() << "MainWindow: Destroying MainWindow";
+    delete collectionController; // Ensure controller is deleted before UI
+    delete credentialsDialog;
     delete ui;
 }
 

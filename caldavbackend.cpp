@@ -17,10 +17,15 @@ CalDAVBackend::CalDAVBackend(const QString &serverUrl, const QString &username, 
 
 CalDAVBackend::~CalDAVBackend()
 {
+    // Kill and clean up all active jobs
     for (KJob *job : m_activeJobs) {
+        disconnect(job, nullptr, this, nullptr); // Disconnect all signals to prevent late emissions
         job->kill(KJob::Quietly);
     }
     m_activeJobs.clear();
+
+    // Clean up temporary Cal objects
+    qDeleteAll(m_calMap);
     m_calMap.clear();
     m_itemFetchQueue.clear();
 }
@@ -102,16 +107,15 @@ void CalDAVBackend::onCollectionsLoaded(KJob *job)
             qDebug() << "CalDAVBackend: Discovered calendar" << meta.id << meta.name;
             emit calendarDiscovered(collectionId, meta);
 
-            // Queue item loading immediately
-            m_calMap[meta.id] = new Cal(meta.id, meta.name, nullptr); // Temporary Cal for sync
+            m_calMap[meta.id] = new Cal(meta.id, meta.name, nullptr);
             m_itemFetchQueue.append(meta.id);
         }
     }
 
     if (!m_itemFetchQueue.isEmpty()) {
         processNextItemLoad();
-    } else {
-        qDebug() << "CalDAVBackend: No items to fetch, sync completed";
+    } else if (m_activeJobs.isEmpty()) {
+        qDebug() << "CalDAVBackend: No items to fetch and no active jobs, sync completed";
         emit syncCompleted(collectionId);
     }
 }
@@ -119,9 +123,14 @@ void CalDAVBackend::onCollectionsLoaded(KJob *job)
 void CalDAVBackend::processNextItemLoad()
 {
     if (m_itemFetchQueue.isEmpty()) {
-        qDebug() << "CalDAVBackend: Item load queue empty, sync completed";
+        qDebug() << "CalDAVBackend: Item load queue empty";
         if (m_activeJobs.isEmpty()) {
+            qDebug() << "CalDAVBackend: All jobs completed, emitting syncCompleted";
             emit syncCompleted(m_calMap.firstKey().split("_").first()); // Extract collectionId
+            qDeleteAll(m_calMap); // Clean up here after sync is fully done
+            m_calMap.clear();
+        } else {
+            qDebug() << "CalDAVBackend: Waiting for" << m_activeJobs.size() << "active jobs to finish";
         }
         return;
     }
@@ -145,8 +154,9 @@ void CalDAVBackend::processNextItemLoad()
     KDAV::DavItemsListJob *listJob = new KDAV::DavItemsListJob(davUrl, cache, this);
     listJob->setProperty("calId", calId);
 
-    connect(listJob, &KJob::finished, this, [listJob](KJob *j) {
+    connect(listJob, &KJob::finished, this, [this, listJob](KJob *j) {
         qDebug() << "CalDAVBackend: List job finished:" << j << "Error:" << j->error() << j->errorString();
+        m_activeJobs.removeOne(listJob); // Remove from tracking once done
     });
 
     connect(listJob, &KDAV::DavItemsListJob::result, this, [this, cal, davUrl](KJob *job) {
@@ -177,7 +187,7 @@ void CalDAVBackend::processNextItemLoad()
         qDebug() << "CalDAVBackend: Preparing MULTIGET for" << urls.size() << "items";
 
         KDAV::DavItemsFetchJob *fetchJob = new KDAV::DavItemsFetchJob(davUrl, urls, this);
-        connect(fetchJob, &KDAV::DavItemsFetchJob::result, this, [this, cal](KJob *job) {
+        connect(fetchJob, &KDAV::DavItemsFetchJob::result, this, [this, cal, fetchJob](KJob *job) {
             QString calId = cal->id();
             if (job->error()) {
                 qDebug() << "CalDAVBackend: MULTIGET error for" << calId << ":" << job->errorString();
@@ -214,6 +224,7 @@ void CalDAVBackend::processNextItemLoad()
                 }
                 emit calendarLoaded(cal);
             }
+            m_activeJobs.removeOne(fetchJob); // Remove after completion
             m_itemFetchQueue.removeFirst();
             processNextItemLoad();
         });

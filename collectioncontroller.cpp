@@ -13,12 +13,17 @@ CollectionController::CollectionController(QObject *parent)
 
 CollectionController::~CollectionController()
 {
-    qDeleteAll(m_collections);
-    for (const QList<BackendInfo> &backendList : m_backends) {
-        for (const BackendInfo &info : backendList) {
-            delete info.backend;
+    qDebug() << "CollectionController: Destroying CollectionController";
+    for (const QString &id : m_backends.keys()) {
+        for (const BackendInfo &info : m_backends[id]) {
+            SyncBackend *backend = info.backend;
+            disconnect(backend, nullptr, this, nullptr); // Disconnect all signals
+            delete backend; // Delete backends explicitly
         }
     }
+    m_backends.clear();
+    qDeleteAll(m_collections); // Delete collections after backends
+    m_collections.clear();
 }
 
 void CollectionController::addCollection(const QString &name, SyncBackend *initialBackend)
