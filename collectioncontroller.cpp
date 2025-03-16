@@ -118,6 +118,7 @@ const QMap<QString, QList<SyncBackend*>> &CollectionController::backends() const
     return rawBackends;
 }
 
+
 bool CollectionController::loadCollection(const QString &kalbPath)
 {
     ConfigManager configManager(this);
@@ -182,11 +183,10 @@ bool CollectionController::loadCollection(const QString &kalbPath)
         }
     }
     m_pendingSyncs[collectionId] = syncCount;
-    m_pendingDataLoads[collectionId] = syncCount; // Keep for old flow compatibility
+    m_pendingDataLoads[collectionId] = syncCount; // Legacy compat
 
     emit collectionAdded(collection);
 
-    // Start with highest-priority backend (local, priority 1)
     if (!backends.isEmpty() && backends.first().syncOnOpen) {
         qDebug() << "CollectionController: Starting sync for backend with priority" << backends.first().priority;
         backends.first().backend->startSync(collectionId);
@@ -198,27 +198,14 @@ bool CollectionController::loadCollection(const QString &kalbPath)
 
 void CollectionController::onDataLoaded()
 {
-    qDebug() << "CollectionController: Data loaded from backend";
-    QList<QString> collectionIds = m_pendingDataLoads.keys(); // Copy keys to avoid modification issues
+    qDebug() << "CollectionController: Data loaded from backend (legacy signal)";
+    // No item loading—purely legacy tracking
+    QList<QString> collectionIds = m_pendingDataLoads.keys();
     for (const QString &collectionId : collectionIds) {
         m_pendingDataLoads[collectionId]--;
-        qDebug() << "CollectionController: Pending loads for" << collectionId << "now" << m_pendingDataLoads[collectionId];
         if (m_pendingDataLoads[collectionId] <= 0) {
-            Collection *col = m_collections.value(collectionId);
-            if (!col) {
-                qDebug() << "CollectionController: No collection found for" << collectionId;
-                continue;
-            }
-            qDebug() << "CollectionController: All calendars loaded for" << collectionId << ", loading items";
-            for (Cal *cal : col->calendars()) {
-                for (const BackendInfo &info : m_backends[collectionId]) {
-                    if (info.syncOnOpen || dynamic_cast<LocalBackend*>(info.backend)) {
-                        qDebug() << "CollectionController: Loading items for" << cal->id();
-                        info.backend->loadItems(cal);
-                    }
-                }
-            }
-            m_pendingDataLoads.remove(collectionId); // Done with this collection
+            qDebug() << "CollectionController: Legacy data load complete for" << collectionId;
+            m_pendingDataLoads.remove(collectionId);
         }
     }
 }
@@ -226,22 +213,39 @@ void CollectionController::onDataLoaded()
 void CollectionController::onCalendarDiscovered(const QString &collectionId, const CalendarMetadata &calendar)
 {
     Collection *col = m_collections.value(collectionId);
-    if (!col) return;
+    if (!col) {
+        qDebug() << "CollectionController: No collection for" << collectionId;
+        return;
+    }
+    if (m_calMap.contains(calendar.id)) {
+        qDebug() << "CollectionController: Calendar" << calendar.id << "already exists";
+        return;
+    }
     Cal *cal = new Cal(calendar.id, calendar.name, col);
     col->addCal(cal);
-    m_calMap[cal->id()] = cal;
+    m_calMap[calendar.id] = cal;
     emit calendarAdded(cal);
 }
 
 void CollectionController::onItemLoaded(Cal *cal, QSharedPointer<CalendarItem> item)
 {
-    cal->addItem(item);
-    emit itemAdded(cal, item);
+    Cal *realCal = m_calMap.value(cal->id());
+    if (!realCal) {
+        qWarning() << "CollectionController: No real Cal for" << cal->id() << "on item load";
+        return;
+    }
+    realCal->addItem(item);
+    emit itemAdded(realCal, item);
 }
 
 void CollectionController::onCalendarLoaded(Cal *cal)
 {
-    emit calendarLoaded(cal);
+    Cal *realCal = m_calMap.value(cal->id());
+    if (!realCal) {
+        qWarning() << "CollectionController: No real Cal for" << cal->id() << "on calendar load";
+        return;
+    }
+    emit calendarLoaded(realCal);
 }
 
 void CollectionController::onSyncCompleted(const QString &collectionId)
@@ -253,6 +257,7 @@ void CollectionController::onSyncCompleted(const QString &collectionId)
         emit loadingProgress(100); // Stub for Stage 1
     }
 }
+
 
 bool CollectionController::saveCollection(const QString &kalbPath, const QString &collectionId)
 {

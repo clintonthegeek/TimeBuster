@@ -129,21 +129,21 @@ void LocalBackend::startSync(const QString &collectionId)
 {
     qDebug() << "LocalBackend: Starting sync for collection" << collectionId;
 
-    // Load calendars
-    QList<CalendarMetadata> calendars = loadCalendars(collectionId); // Uses existing method
+    QList<CalendarMetadata> calendars = loadCalendars(collectionId);
     for (const CalendarMetadata &meta : calendars) {
         emit calendarDiscovered(collectionId, meta);
-        Cal *cal = new Cal(meta.id, meta.name, nullptr); // Temp for loading
-        QList<QSharedPointer<CalendarItem>> items = loadItems(cal); // Uses existing method
+        // Temporary Cal for loading—controller will manage the real one
+        Cal *tempCal = new Cal(meta.id, meta.name, nullptr);
+        QList<QSharedPointer<CalendarItem>> items = loadItems(tempCal);
         for (const QSharedPointer<CalendarItem> &item : items) {
-            emit itemLoaded(cal, item);
+            emit itemLoaded(tempCal, item);
         }
-        emit calendarLoaded(cal);
+        emit calendarLoaded(tempCal);
+        delete tempCal; // Clean up—controller owns the persisted Cal
     }
 
     emit syncCompleted(collectionId);
 }
-
 void LocalBackend::storeCalendars(const QString &collectionId, const QList<Cal*> &calendars)
 {
     qDebug() << "LocalBackend: Storing calendars for collection" << collectionId << "with" << calendars.size() << "calendars";

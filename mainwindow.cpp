@@ -127,12 +127,11 @@ void MainWindow::syncCollections()
 
 void MainWindow::onItemAdded(Cal *cal, QSharedPointer<CalendarItem> item)
 {
-    Q_UNUSED(item);
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
             if (view->model()->id() == cal->id()) {
-                view->refresh(); // Static for Stage 1, live in Stage 2
-                qDebug() << "MainWindow: Item added to" << cal->id();
+                view->refresh(); // Still static—Stage 2 will make it live
+                qDebug() << "MainWindow: Item added to" << cal->id() << " - " << item->id();
                 break;
             }
         }
