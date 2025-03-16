@@ -27,22 +27,14 @@ CalDAVBackend::~CalDAVBackend()
 
 QList<CalendarMetadata> CalDAVBackend::loadCalendars(const QString &collectionId)
 {
-    qDebug() << "CalDAVBackend: Starting loadCalendars for collection" << collectionId;
-    QUrl url(m_serverUrl);
-    url.setUserName(m_username);
-    url.setPassword(m_password);
-    qDebug() << "CalDAV URL:" << url.toString(QUrl::RemovePassword);
+    qDebug() << "CalDAVBackend: loadCalendars called for" << collectionId << "(stub)";
+    return QList<CalendarMetadata>(); // Legacy support, real work in startSync
+}
 
-    KDAV::DavUrl davUrl(url, KDAV::CalDav);
-    KDAV::DavCollectionsFetchJob *job = new KDAV::DavCollectionsFetchJob(davUrl);
-    job->setProperty("collectionId", collectionId);
-    connect(job, &KDAV::DavCollectionsFetchJob::result, this, &CalDAVBackend::onCollectionsLoaded);
-    qDebug() << "CalDAVBackend: Job created, starting...";
-    m_activeJobs.append(job); // Use append for QList
-    job->start();
-
-    qDebug() << "CalDAVBackend: loadCalendars returning empty list (async)";
-    return QList<CalendarMetadata>();
+QList<QSharedPointer<CalendarItem>> CalDAVBackend::loadItems(Cal *cal)
+{
+    qDebug() << "CalDAVBackend: loadItems called for" << cal->id() << "(stub)";
+    return QList<QSharedPointer<CalendarItem>>(); // Legacy support
 }
 
 void CalDAVBackend::storeCalendars(const QString &collectionId, const QList<Cal*> &calendars)
@@ -59,30 +51,33 @@ void CalDAVBackend::storeItems(Cal *cal, const QList<QSharedPointer<CalendarItem
     Q_UNUSED(items);
 }
 
-QList<QSharedPointer<CalendarItem>> CalDAVBackend::loadItems(Cal *cal)
+void CalDAVBackend::updateItem(const QString &calId, const QString &itemId, const QString &icalData)
 {
-    QString calId = cal->id();
-    qDebug() << "CalDAVBackend: Queuing loadItems for" << calId;
-    m_calMap[calId] = cal;
-    if (!m_idToUrl.contains(calId)) {
-        qDebug() << "CalDAVBackend: Unknown calId" << calId;
-        return {};
-    }
-    if (m_itemFetchQueue.contains(calId)) {
-        qDebug() << "CalDAVBackend: Already loading items for" << calId;
-        return {};
-    }
-    m_itemFetchQueue.append(calId);
-    if (m_itemFetchQueue.size() == 1) {
-        processNextItemLoad();
-    }
-    return {};
+    qDebug() << "CalDAVBackend: updateItem stub for" << calId << "item" << itemId;
+    emit errorOccurred("Update not implemented for CalDAVBackend");
+}
+
+void CalDAVBackend::startSync(const QString &collectionId)
+{
+    qDebug() << "CalDAVBackend: Starting sync for collection" << collectionId;
+    QUrl url(m_serverUrl);
+    url.setUserName(m_username);
+    url.setPassword(m_password);
+    qDebug() << "CalDAV URL:" << url.toString(QUrl::RemovePassword);
+
+    KDAV::DavUrl davUrl(url, KDAV::CalDav);
+    KDAV::DavCollectionsFetchJob *job = new KDAV::DavCollectionsFetchJob(davUrl);
+    job->setProperty("collectionId", collectionId);
+    connect(job, &KDAV::DavCollectionsFetchJob::result, this, &CalDAVBackend::onCollectionsLoaded);
+    qDebug() << "CalDAVBackend: Job created, starting...";
+    m_activeJobs.append(job);
+    job->start();
 }
 
 void CalDAVBackend::onCollectionsLoaded(KJob *job)
 {
     qDebug() << "CalDAVBackend: onCollectionsLoaded triggered";
-    m_activeJobs.removeOne(job); // Use removeOne for QList
+    m_activeJobs.removeOne(job);
     if (job->error()) {
         qDebug() << "CalDAVBackend: Error:" << job->error() << job->errorString();
         emit errorOccurred(job->errorString());
@@ -106,21 +101,35 @@ void CalDAVBackend::onCollectionsLoaded(KJob *job)
             m_idToUrl[meta.id] = col.url().toDisplayString();
             qDebug() << "CalDAVBackend: Discovered calendar" << meta.id << meta.name;
             emit calendarDiscovered(collectionId, meta);
+
+            // Queue item loading immediately
+            m_calMap[meta.id] = new Cal(meta.id, meta.name, nullptr); // Temporary Cal for sync
+            m_itemFetchQueue.append(meta.id);
         }
+    }
+
+    if (!m_itemFetchQueue.isEmpty()) {
+        processNextItemLoad();
+    } else {
+        qDebug() << "CalDAVBackend: No items to fetch, sync completed";
+        emit syncCompleted(collectionId);
     }
 }
 
 void CalDAVBackend::processNextItemLoad()
 {
     if (m_itemFetchQueue.isEmpty()) {
-        qDebug() << "CalDAVBackend: Item load queue empty";
+        qDebug() << "CalDAVBackend: Item load queue empty, sync completed";
+        if (m_activeJobs.isEmpty()) {
+            emit syncCompleted(m_calMap.firstKey().split("_").first()); // Extract collectionId
+        }
         return;
     }
 
     QString calId = m_itemFetchQueue.first();
     qDebug() << "CalDAVBackend: Processing loadItems for" << calId;
 
-    Cal *cal = m_calMap.value(calId, nullptr);
+    Cal *cal = m_calMap.value(calId);
     if (!cal) {
         qDebug() << "CalDAVBackend: No Cal found in m_calMap for" << calId;
         m_itemFetchQueue.removeFirst();
@@ -210,29 +219,11 @@ void CalDAVBackend::processNextItemLoad()
         });
 
         qDebug() << "CalDAVBackend: Starting MULTIGET job for" << calId;
-        m_activeJobs.append(fetchJob); // Use append for QList
+        m_activeJobs.append(fetchJob);
         fetchJob->start();
     });
 
     qDebug() << "CalDAVBackend: Starting items list job for" << calId << "Job:" << listJob;
-    m_activeJobs.append(listJob); // Use append for QList
+    m_activeJobs.append(listJob);
     listJob->start();
-}
-
-void CalDAVBackend::updateItem(const QString &calId, const QString &itemId, const QString &icalData)
-{
-    qDebug() << "CalDAVBackend: updateItem stub for" << calId << "item" << itemId;
-    emit errorOccurred("Update not implemented for CalDAVBackend");
-}
-
-void CalDAVBackend::startSync(const QString &collectionId)
-{
-    qDebug() << "CalDAVBackend: Starting sync for collection" << collectionId;
-    QList<CalendarMetadata> calendars = loadCalendars(collectionId); // Triggers async fetch
-    connect(this, &CalDAVBackend::calendarLoaded, this, [this, collectionId](Cal *cal) {
-        if (m_itemFetchQueue.isEmpty() && m_activeJobs.isEmpty()) {
-            qDebug() << "CalDAVBackend: Sync completed for" << collectionId;
-            emit syncCompleted(collectionId);
-        }
-    });
 }
