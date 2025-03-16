@@ -6,7 +6,7 @@
 CalendarItem::CalendarItem(const QString &calId, const QString &itemId, QObject *parent)
     : QObject(parent), m_calId(calId), m_itemId(itemId), m_lastModified(QDateTime::currentDateTime())
 {
-    qDebug() << "CalendarItem: Created with calId" << calId << "itemId" << itemId;
+    //qDebug() << "CalendarItem: Created with calId" << calId << "itemId" << itemId;
 }
 
 void CalendarItem::setIncidence(const KCalendarCore::Incidence::Ptr &incidence)
@@ -14,7 +14,7 @@ void CalendarItem::setIncidence(const KCalendarCore::Incidence::Ptr &incidence)
     m_incidence = incidence;
     if (incidence) {
         m_lastModified = QDateTime::currentDateTime();
-        qDebug() << "CalendarItem: Set incidence for" << m_itemId;
+        //qDebug() << "CalendarItem: Set incidence for" << m_itemId;
     }
 }
 

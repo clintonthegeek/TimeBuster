@@ -13,7 +13,15 @@ public:
     void setBasePath(const QString &path);
     bool saveBackendConfig(const QString &collectionId, const QString &collectionName, const QList<SyncBackend*> &backends, const QString &kalbPath = QString());
     QList<SyncBackend*> loadBackendConfig(const QString &collectionId, const QString &kalbPath = QString());
-    QVariantMap loadConfig(const QString &collectionId, const QString &kalbPath = QString()); // New method
+    QVariantMap loadConfig(const QString &collectionId, const QString &kalbPath = QString());
+
+    // New struct to hold backend configuration with priority and sync settings
+    struct BackendConfig {
+        QString type;
+        QVariantMap details;
+        int priority;
+        bool syncOnOpen;
+    };
 
 private:
     QString configPath(const QString &collectionId, const QString &kalbPath) const;

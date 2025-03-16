@@ -37,15 +37,14 @@
      <string>&amp;File</string>
     </property>
     <addaction name="actionOpenCollection"/>
+    <addaction name="actionCreateLocalFromRemote"/>
+    <addaction name="separator"/>
+    <addaction name="separator"/>
+    <addaction name="actionAddLocalCollection"/>
+    <addaction name="actionAddRemoteCollection"/>
     <addaction name="separator"/>
     <addaction name="separator"/>
     <addaction name="actionEditItem"/>
-    <addaction name="actionAddLocalCollection"/>
-    <addaction name="actionAddRemoteCollection"/>
-    <addaction name="actionCreateLocalFromRemote"/>
-    <addaction name="separator"/>
-    <addaction name="actionAttachToLocal"/>
-    <addaction name="separator"/>
     <addaction name="actionOpenLocal"/>
     <addaction name="actionSaveChanges"/>
     <addaction name="separator"/>
@@ -88,11 +87,6 @@
   <action name="actionOpenLocal">
    <property name="text">
     <string>Open Local (deprc)</string>
-   </property>
-  </action>
-  <action name="actionAttachToLocal">
-   <property name="text">
-    <string>Attach to Local</string>
    </property>
   </action>
   <action name="actionEditItem">

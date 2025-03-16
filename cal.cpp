@@ -17,7 +17,7 @@ void Cal::addItem(QSharedPointer<CalendarItem> item)
     beginInsertRows(QModelIndex(), m_items.size(), m_items.size());
     m_items.append(item);
     endInsertRows();
-    qDebug() << "Cal: Added item" << item->id() << "to" << m_id;
+    //qDebug() << "Cal: Added item" << item->id() << "to" << m_id;
 }
 
 void Cal::updateItem(const QSharedPointer<CalendarItem> &item)

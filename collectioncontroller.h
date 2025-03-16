@@ -24,7 +24,7 @@ public:
 
     bool loadCollection(const QString &kalbPath);
     bool saveCollection(const QString &kalbPath, const QString &collectionId);
-    const QMap<QString, Collection*> &collections() const { return m_collections; } // New getter
+    const QMap<QString, Collection*> &collections() const { return m_collections; }
 
 signals:
     void collectionAdded(Collection *collection);
@@ -34,10 +34,18 @@ signals:
 private slots:
     void onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars);
     void onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items);
+    void onDataLoaded();
 
 private:
+    // Struct to track backend metadata
+    struct BackendInfo {
+        SyncBackend *backend;
+        int priority;
+        bool syncOnOpen;
+    };
+
     QMap<QString, Collection*> m_collections;
-    QMap<QString, QList<SyncBackend*>> m_backends;
+    QMap<QString, QList<BackendInfo>> m_backends; // Now stores BackendInfo instead of raw SyncBackend*
     QMap<QString, Cal*> m_calMap;
     int m_collectionCounter;
 };

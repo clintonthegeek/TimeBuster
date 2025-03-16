@@ -61,7 +61,7 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
     KCalendarCore::ICalFormat format;
     for (const QString &fileName : icsFiles) {
         QString filePath = calDir.filePath(fileName);
-        qDebug() << "LocalBackend: Processing file" << filePath;
+        //qDebug() << "LocalBackend: Processing file" << filePath;
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             qWarning() << "LocalBackend: Failed to open" << filePath << ":" << file.errorString();
@@ -74,8 +74,8 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
             qWarning() << "LocalBackend: Empty ICS data in" << filePath;
             continue;
         }
-        qDebug() << "LocalBackend: Read" << icalData.size() << "bytes from" << filePath;
-        qDebug() << "LocalBackend: ICS data (snippet):" << icalData.left(200);
+       // qDebug() << "LocalBackend: Read" << icalData.size() << "bytes from" << filePath;
+      //  qDebug() << "LocalBackend: ICS data (snippet):" << icalData.left(200);
 
         KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone::systemTimeZone()));
         if (!format.fromString(tempCalendar, icalData)) {
@@ -116,7 +116,7 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
         item->setEtag(""); // No ETag for local files
         items.append(item);
         m_idToPath[itemId] = filePath;
-        qDebug() << "LocalBackend: Loaded" << item->type() << itemId << "from" << filePath;
+        //qDebug() << "LocalBackend: Loaded" << item->type() << itemId << "from" << filePath;
     }
 
     qDebug() << "LocalBackend: Loaded" << items.size() << "items for calendar" << cal->name();

@@ -190,7 +190,7 @@ void CalDAVBackend::processNextItemLoad()
                         qDebug() << "CalDAVBackend: Empty data for" << item.url().toDisplayString() << "- skipping";
                         continue;
                     }
-                    qDebug() << "CalDAVBackend: Raw data size:" << rawData.size() << "bytes" << rawData.left(100);
+                    //qDebug() << "CalDAVBackend: Raw data size:" << rawData.size() << "bytes" << rawData.left(100);
                     auto incidence = format.fromString(QString::fromUtf8(rawData));
                     if (!incidence) {
                         qDebug() << "CalDAVBackend: Failed to parse item" << item.url().toDisplayString();
@@ -207,7 +207,7 @@ void CalDAVBackend::processNextItemLoad()
                     if (calItem) {
                         calItem->setIncidence(incidence);
                         result.append(calItem);
-                        qDebug() << "CalDAVBackend: Added" << calItem->type() << calItem->id();
+                        //qDebug() << "CalDAVBackend: Added" << calItem->type() << calItem->id();
                     }
                 }
 

@@ -6,8 +6,6 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QDebug>
-#include <QString>
-
 
 ConfigManager::ConfigManager(QObject *parent)
     : QObject(parent)
@@ -53,16 +51,20 @@ bool ConfigManager::saveBackendConfig(const QString &collectionId, const QString
 
     // Backends element
     writer.writeStartElement("Backends");
-    for (int i = 0; i < backends.size(); ++i) {
+    for (SyncBackend *backend : backends) {
         writer.writeStartElement("Backend");
-        if (LocalBackend *local = dynamic_cast<LocalBackend*>(backends[i])) {
+        if (LocalBackend *local = dynamic_cast<LocalBackend*>(backend)) {
             writer.writeAttribute("type", "local");
             writer.writeTextElement("RootPath", local->rootPath());
-        } else if (CalDAVBackend *caldav = dynamic_cast<CalDAVBackend*>(backends[i])) {
+            writer.writeTextElement("priority", "1"); // Default priority for local
+            writer.writeTextElement("SyncOnOpen", "false"); // Default no sync
+        } else if (CalDAVBackend *caldav = dynamic_cast<CalDAVBackend*>(backend)) {
             writer.writeAttribute("type", "caldav");
             writer.writeTextElement("ServerUrl", caldav->serverUrl());
             writer.writeTextElement("Username", caldav->username());
             writer.writeTextElement("Password", caldav->password());
+            writer.writeTextElement("priority", "2"); // Default priority for caldav
+            writer.writeTextElement("SyncOnOpen", "false"); // Default no sync
         }
         writer.writeEndElement(); // Backend
     }
@@ -73,57 +75,29 @@ bool ConfigManager::saveBackendConfig(const QString &collectionId, const QString
 
     file.close();
     qDebug() << "ConfigManager: Saved config to" << path;
-    return true; // Return true on success
+    return true;
 }
 
 QList<SyncBackend*> ConfigManager::loadBackendConfig(const QString &collectionId, const QString &kalbPath)
 {
     QList<SyncBackend*> backends;
-    QString path = configPath(collectionId, kalbPath);
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "ConfigManager: Failed to open file for reading:" << path;
-        return backends;
-    }
+    QVariantMap config = loadConfig(collectionId, kalbPath);
+    QVariantList backendsList = config.value("backends").toList();
 
-    QXmlStreamReader reader(&file);
-    while (!reader.atEnd() && !reader.hasError()) {
-        reader.readNext();
-        if (reader.isStartElement() && reader.name() == "Backend") {
-            QString type = reader.attributes().value("type").toString();
-            if (type == "local") {
-                QString rootPath;
-                while (!(reader.isEndElement() && reader.name() == "Backend")) {
-                    reader.readNext();
-                    if (reader.isStartElement() && reader.name() == "RootPath") {
-                        rootPath = reader.readElementText();
-                    }
-                }
-                backends.append(new LocalBackend(rootPath, this));
-            } else if (type == "caldav") {
-                QString serverUrl, username, password;
-                while (!(reader.isEndElement() && reader.name() == "Backend")) {
-                    reader.readNext();
-                    if (reader.isStartElement()) {
-                        if (reader.name() == "ServerUrl") {
-                            serverUrl = reader.readElementText();
-                        } else if (reader.name() == "Username") {
-                            username = reader.readElementText();
-                        } else if (reader.name() == "Password") {
-                            password = reader.readElementText();
-                        }
-                    }
-                }
-                backends.append(new CalDAVBackend(serverUrl, username, password, this));
-            }
+    for (const QVariant &backendVar : backendsList) {
+        QVariantMap backendMap = backendVar.toMap();
+        QString type = backendMap.value("type").toString();
+        if (type == "local") {
+            QString rootPath = backendMap.value("rootPath").toString();
+            backends.append(new LocalBackend(rootPath, this));
+        } else if (type == "caldav") {
+            QString serverUrl = backendMap.value("serverUrl").toString();
+            QString username = backendMap.value("username").toString();
+            QString password = backendMap.value("password").toString();
+            backends.append(new CalDAVBackend(serverUrl, username, password, this));
         }
     }
 
-    if (reader.hasError()) {
-        qDebug() << "ConfigManager: XML parse error:" << reader.errorString();
-    }
-
-    file.close();
     return backends;
 }
 
@@ -155,31 +129,34 @@ QVariantMap ConfigManager::loadConfig(const QString &collectionId, const QString
                     }
                 }
             } else if (reader.name() == "Backend") {
-                QVariantMap backend;
-                QString type = reader.attributes().value("type").toString();
-                backend["type"] = type;
-                if (type == "local") {
-                    while (!(reader.isEndElement() && reader.name() == "Backend")) {
-                        reader.readNext();
-                        if (reader.isStartElement() && reader.name() == "RootPath") {
-                            backend["rootPath"] = reader.readElementText();
-                        }
-                    }
-                } else if (type == "caldav") {
-                    while (!(reader.isEndElement() && reader.name() == "Backend")) {
-                        reader.readNext();
-                        if (reader.isStartElement()) {
-                            if (reader.name() == "ServerUrl") {
-                                backend["serverUrl"] = reader.readElementText();
-                            } else if (reader.name() == "Username") {
-                                backend["username"] = reader.readElementText();
-                            } else if (reader.name() == "Password") {
-                                backend["password"] = reader.readElementText();
-                            }
+                ConfigManager::BackendConfig backend;
+                backend.type = reader.attributes().value("type").toString();
+                backend.details.clear();
+                backend.priority = 0; // Default priority
+                backend.syncOnOpen = false; // Default no sync
+
+                while (!(reader.isEndElement() && reader.name() == "Backend")) {
+                    reader.readNext();
+                    if (reader.isStartElement()) {
+                        if (reader.name() == "RootPath") {
+                            backend.details["rootPath"] = reader.readElementText();
+                        } else if (reader.name() == "ServerUrl") {
+                            backend.details["serverUrl"] = reader.readElementText();
+                        } else if (reader.name() == "Username") {
+                            backend.details["username"] = reader.readElementText();
+                        } else if (reader.name() == "Password") {
+                            backend.details["password"] = reader.readElementText();
+                        } else if (reader.name() == "priority") {
+                            bool ok;
+                            int pri = reader.readElementText().toInt(&ok);
+                            if (ok) backend.priority = pri;
+                        } else if (reader.name() == "SyncOnOpen") {
+                            QString value = reader.readElementText().toLower();
+                            backend.syncOnOpen = (value == "true");
                         }
                     }
                 }
-                backendsList.append(backend);
+                backendsList.append(QVariant::fromValue(backend));
             }
         }
     }
