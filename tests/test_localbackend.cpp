@@ -45,7 +45,7 @@ void TestLocalBackend::initTestCase()
         "DTEND:20250315T110000Z\n"
         "END:VEVENT\n"
         "END:VCALENDAR\n"
-    );
+        );
 
     QFile eventFile(rootPath + "/Test Calendar/12345.ics");
     QVERIFY(eventFile.open(QIODevice::WriteOnly | QIODevice::Text));
@@ -64,7 +64,7 @@ void TestLocalBackend::initTestCase()
         "DUE:20250315T120000Z\n"
         "END:VTODO\n"
         "END:VCALENDAR\n"
-    );
+        );
 
     QFile todoFile(rootPath + "/Test Calendar/67890.ics");
     QVERIFY(todoFile.open(QIODevice::WriteOnly | QIODevice::Text));
@@ -92,33 +92,28 @@ void TestLocalBackend::testLoadItems()
 
     // Create a Cal object to pass to loadItems
     Cal *cal = new Cal("col0_test_calendar", "Test Calendar", nullptr);
-    QList<QSharedPointer<CalendarItem>> items;
 
-    // Connect to itemsLoaded signal to capture the result
-    bool signalReceived = false;
-    connect(backend, &LocalBackend::itemsLoaded, this,
-            [&items, &signalReceived](Cal *c, const QList<QSharedPointer<CalendarItem>> &loadedItems) {
-                Q_UNUSED(c);
-                items = loadedItems;
-                signalReceived = true;
-            });
-
-    backend->loadItems(cal);
-    QTRY_VERIFY_WITH_TIMEOUT(signalReceived, 5000);
+    // Call loadItems directly and get the result
+    QList<QSharedPointer<CalendarItem>> items = backend->loadItems(cal);
 
     QCOMPARE(items.size(), 2);
 
-    // Verify the Event
-    QSharedPointer<CalendarItem> eventItem = items[0];
-    QCOMPARE(eventItem->type(), QString("Event"));
-    QCOMPARE(eventItem->id(), QString("col0_test_calendar_12345"));
-    QCOMPARE(eventItem->incidence()->summary(), QString("Test Event"));
+    // Verify the Event (order might vary, so check both items)
+    bool foundEvent = false;
+    bool foundTodo = false;
+    for (const auto &item : items) {
+        if (item->type() == "Event" && item->id() == "col0_test_calendar_12345") {
+            QCOMPARE(item->incidence()->summary(), QString("Test Event"));
+            foundEvent = true;
+        } else if (item->type() == "Todo" && item->id() == "col0_test_calendar_67890") {
+            QCOMPARE(item->incidence()->summary(), QString("Test Todo"));
+            foundTodo = true;
+        }
+    }
+    QVERIFY(foundEvent);
+    QVERIFY(foundTodo);
 
-    // Verify the Todo
-    QSharedPointer<CalendarItem> todoItem = items[1];
-    QCOMPARE(todoItem->type(), QString("Todo"));
-    QCOMPARE(todoItem->id(), QString("col0_test_calendar_67890"));
-    QCOMPARE(todoItem->incidence()->summary(), QString("Test Todo"));
+    delete cal; // Clean up
 }
 
 QTEST_MAIN(TestLocalBackend)

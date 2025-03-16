@@ -32,9 +32,6 @@ public:
 
 signals:
     // Existing signals
-    void calendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars);
-    void itemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items);
-    void dataLoaded();
     void errorOccurred(const QString &error);
 
     // New granular signals

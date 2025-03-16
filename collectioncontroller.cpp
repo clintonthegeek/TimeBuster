@@ -44,9 +44,6 @@ void CollectionController::addCollection(const QString &name, SyncBackend *initi
         info.syncOnOpen = false;
         m_backends[id].append(info);
         initialBackend->setParent(this);
-        connect(initialBackend, &SyncBackend::calendarsLoaded, this, &CollectionController::onCalendarsLoaded);
-        connect(initialBackend, &SyncBackend::itemsLoaded, this, &CollectionController::onItemsLoaded);
-        connect(initialBackend, &SyncBackend::dataLoaded, this, &CollectionController::onDataLoaded);
         connect(initialBackend, &SyncBackend::errorOccurred, this, [](const QString &error) {
             qDebug() << "CollectionController: Error from backend:" << error;
         });
@@ -54,8 +51,8 @@ void CollectionController::addCollection(const QString &name, SyncBackend *initi
         ConfigManager configManager(this);
         configManager.saveBackendConfig(id, name, {initialBackend});
 
-        m_pendingDataLoads[id] = 1;
-        initialBackend->loadCalendars(id);
+        // No data load signals anymore—rely on explicit sync if needed
+        initialBackend->startSync(id); // Trigger sync instead of legacy loadCalendars
     }
 
     emit collectionAdded(col);
@@ -80,9 +77,6 @@ void CollectionController::attachLocalBackend(const QString &collectionId, SyncB
     m_backends[collectionId].append(info);
     localBackend->setParent(this);
 
-    connect(localBackend, &SyncBackend::calendarsLoaded, this, &CollectionController::onCalendarsLoaded);
-    connect(localBackend, &SyncBackend::itemsLoaded, this, &CollectionController::onItemsLoaded);
-    connect(localBackend, &SyncBackend::dataLoaded, this, &CollectionController::onDataLoaded);
     connect(localBackend, &SyncBackend::errorOccurred, this, [](const QString &error) {
         qDebug() << "CollectionController: Error from backend:" << error;
     });
@@ -169,11 +163,9 @@ bool CollectionController::loadCollection(const QString &kalbPath)
     int syncCount = 0;
     for (BackendInfo &info : backends) {
         if (info.syncOnOpen) {
-            connect(info.backend, &SyncBackend::calendarsLoaded, this, &CollectionController::onCalendarsLoaded);
-            connect(info.backend, &SyncBackend::itemsLoaded, this, &CollectionController::onItemsLoaded);
-            connect(info.backend, &SyncBackend::dataLoaded, this, &CollectionController::onDataLoaded);
+            qDebug() << "CollectionController: Connecting signals for backend with priority" << info.priority;
             connect(info.backend, &SyncBackend::calendarDiscovered, this, &CollectionController::onCalendarDiscovered);
-            connect(info.backend, &SyncBackend::itemLoaded, this, &CollectionController::onItemLoaded);
+            connect(info.backend, &SyncBackend::itemLoaded, this, &CollectionController::onItemLoaded, Qt::UniqueConnection);
             connect(info.backend, &SyncBackend::calendarLoaded, this, &CollectionController::onCalendarLoaded);
             connect(info.backend, &SyncBackend::syncCompleted, this, &CollectionController::onSyncCompleted);
             connect(info.backend, &SyncBackend::errorOccurred, this, [](const QString &error) {
@@ -183,7 +175,6 @@ bool CollectionController::loadCollection(const QString &kalbPath)
         }
     }
     m_pendingSyncs[collectionId] = syncCount;
-    m_pendingDataLoads[collectionId] = syncCount; // Legacy compat
 
     emit collectionAdded(collection);
 
@@ -195,11 +186,9 @@ bool CollectionController::loadCollection(const QString &kalbPath)
     return true;
 }
 
-
 void CollectionController::onDataLoaded()
 {
     qDebug() << "CollectionController: Data loaded from backend (legacy signal)";
-    // No item loading—purely legacy tracking
     QList<QString> collectionIds = m_pendingDataLoads.keys();
     for (const QString &collectionId : collectionIds) {
         m_pendingDataLoads[collectionId]--;
@@ -218,7 +207,7 @@ void CollectionController::onCalendarDiscovered(const QString &collectionId, con
         return;
     }
     if (m_calMap.contains(calendar.id)) {
-        qDebug() << "CollectionController: Calendar" << calendar.id << "already exists";
+        qDebug() << "CollectionController: Skipping duplicate calendar" << calendar.id;
         return;
     }
     Cal *cal = new Cal(calendar.id, calendar.name, col);
@@ -227,24 +216,26 @@ void CollectionController::onCalendarDiscovered(const QString &collectionId, con
     emit calendarAdded(cal);
 }
 
-void CollectionController::onItemLoaded(Cal *cal, QSharedPointer<CalendarItem> item)
+void CollectionController::onItemLoaded(Cal *tempCal, QSharedPointer<CalendarItem> item)
 {
-    Cal *realCal = m_calMap.value(cal->id());
+    Cal *realCal = m_calMap.value(tempCal->id());
     if (!realCal) {
-        qWarning() << "CollectionController: No real Cal for" << cal->id() << "on item load";
+        qWarning() << "CollectionController: No real Cal for" << tempCal->id() << "on item load";
         return;
     }
+    qDebug() << "CollectionController: Adding item" << item->id() << "to" << realCal->id();
     realCal->addItem(item);
     emit itemAdded(realCal, item);
 }
 
-void CollectionController::onCalendarLoaded(Cal *cal)
+void CollectionController::onCalendarLoaded(Cal *tempCal)
 {
-    Cal *realCal = m_calMap.value(cal->id());
+    Cal *realCal = m_calMap.value(tempCal->id());
     if (!realCal) {
-        qWarning() << "CollectionController: No real Cal for" << cal->id() << "on calendar load";
+        qWarning() << "CollectionController: No real Cal for" << tempCal->id() << "on calendar load";
         return;
     }
+    qDebug() << "CollectionController: Calendar loaded:" << realCal->id();
     emit calendarLoaded(realCal);
 }
 
@@ -279,52 +270,20 @@ bool CollectionController::saveCollection(const QString &kalbPath, const QString
     return true;
 }
 
+
 void CollectionController::onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars)
 {
-    qDebug() << "CollectionController: Received calendarsLoaded for" << collectionId;
-    Collection *col = m_collections.value(collectionId);
-    if (!col) {
-        qDebug() << "CollectionController: Unknown collection" << collectionId;
-        return;
-    }
-
-    QSet<QString> existingCalIds;
-    for (Cal *cal : col->calendars()) {
-        existingCalIds.insert(cal->id());
-    }
-
-    for (const CalendarMetadata &cal : calendars) {
-        if (!existingCalIds.contains(cal.id)) {
-            col->addCal(new Cal(cal.id, cal.name, col));
-            existingCalIds.insert(cal.id);
-        }
-    }
-
-    // Update m_calMap here too, since onCollectionAdded needs it
-    m_calMap.clear();
-    for (Cal *cal : col->calendars()) {
-        m_calMap[cal->id()] = cal;
-    }
-
-    emit calendarsLoaded(collectionId, calendars);
+    Q_UNUSED(collectionId);
+    Q_UNUSED(calendars);
+    qDebug() << "CollectionController: Ignoring legacy calendarsLoaded for" << collectionId;
+    // Do nothing—let onCalendarDiscovered handle it
 }
 
 void CollectionController::onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items)
 {
-    qDebug() << "CollectionController: Received itemsLoaded for" << cal->id() << "with" << items.size() << "items";
-
-    QSet<QString> existingItemIds;
-    for (const QSharedPointer<CalendarItem> &item : cal->items()) {
-        existingItemIds.insert(item->id());
-    }
-
-    for (const QSharedPointer<CalendarItem> &item : items) {
-        if (!existingItemIds.contains(item->id())) {
-            cal->addItem(item);
-            existingItemIds.insert(item->id());
-        }
-    }
-
-    emit itemsLoaded(cal, cal->items());
+    Q_UNUSED(cal);
+    Q_UNUSED(items);
+    qDebug() << "CollectionController: Ignoring legacy itemsLoaded for" << cal->id();
+    // Do nothing—let onItemLoaded handle it
 }
 

@@ -55,17 +55,11 @@ MainWindow::~MainWindow()
 void MainWindow::addCalendarView(Cal *cal)
 {
     CalendarView *view = new CalendarView(cal, this);
-    QMdiSubWindow *subWindow = new QMdiSubWindow(this);
-    subWindow->setWidget(view);
-    subWindow->setWindowTitle(cal->name());
-    ui->mdiArea->addSubWindow(subWindow);
+    QMdiSubWindow *subWindow = ui->mdiArea->addSubWindow(view);
+    subWindow->setAttribute(Qt::WA_DeleteOnClose);
     subWindow->resize(400, 300);
     subWindow->show();
-    activeCal = cal->id();
-    qDebug() << "MainWindow: Set activeCal to" << activeCal;
-    if (collectionController->getCal(activeCal)) {
-        qDebug() << "MainWindow: Focused on" << activeCal;
-    }
+    qDebug() << "MainWindow: Added subwindow for" << cal->id();
 }
 
 void MainWindow::addLocalCollection()
@@ -130,8 +124,8 @@ void MainWindow::onItemAdded(Cal *cal, QSharedPointer<CalendarItem> item)
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
             if (view->model()->id() == cal->id()) {
-                view->refresh(); // Still static—Stage 2 will make it live
-                qDebug() << "MainWindow: Item added to" << cal->id() << " - " << item->id();
+                qDebug() << "MainWindow: Updating view for" << cal->id() << "with item" << item->id();
+                view->refresh(); // Temporary—Stage 2 will refine this
                 break;
             }
         }

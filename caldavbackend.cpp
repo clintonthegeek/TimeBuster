@@ -38,6 +38,7 @@ QList<CalendarMetadata> CalDAVBackend::loadCalendars(const QString &collectionId
     job->setProperty("collectionId", collectionId);
     connect(job, &KDAV::DavCollectionsFetchJob::result, this, &CalDAVBackend::onCollectionsLoaded);
     qDebug() << "CalDAVBackend: Job created, starting...";
+    m_activeJobs.append(job); // Use append for QList
     job->start();
 
     qDebug() << "CalDAVBackend: loadCalendars returning empty list (async)";
@@ -81,6 +82,7 @@ QList<QSharedPointer<CalendarItem>> CalDAVBackend::loadItems(Cal *cal)
 void CalDAVBackend::onCollectionsLoaded(KJob *job)
 {
     qDebug() << "CalDAVBackend: onCollectionsLoaded triggered";
+    m_activeJobs.removeOne(job); // Use removeOne for QList
     if (job->error()) {
         qDebug() << "CalDAVBackend: Error:" << job->error() << job->errorString();
         emit errorOccurred(job->errorString());
@@ -89,7 +91,6 @@ void CalDAVBackend::onCollectionsLoaded(KJob *job)
 
     KDAV::DavCollectionsFetchJob *fetchJob = qobject_cast<KDAV::DavCollectionsFetchJob*>(job);
     KDAV::DavCollection::List collections = fetchJob->collections();
-    QList<CalendarMetadata> calendars;
     QString collectionId = fetchJob->property("collectionId").toString();
 
     qDebug() << "CalDAVBackend: Found" << collections.size() << "collections";
@@ -102,15 +103,11 @@ void CalDAVBackend::onCollectionsLoaded(KJob *job)
             QString simplifiedName = col.displayName().toLower().replace(QRegularExpression("[^a-z0-9]"), "_");
             meta.id = collectionId + "_" + simplifiedName;
             meta.name = col.displayName().isEmpty() ? col.url().toDisplayString() : col.displayName();
-            calendars.append(meta);
             m_idToUrl[meta.id] = col.url().toDisplayString();
-            qDebug() << "CalDAVBackend: Added calendar" << meta.id << meta.name;
+            qDebug() << "CalDAVBackend: Discovered calendar" << meta.id << meta.name;
+            emit calendarDiscovered(collectionId, meta);
         }
     }
-
-    qDebug() << "CalDAVBackend: Emitting calendarsLoaded for" << collectionId << "with" << calendars.size() << "calendars";
-    emit calendarsLoaded(collectionId, calendars);
-    emit dataLoaded();
 }
 
 void CalDAVBackend::processNextItemLoad()
@@ -123,7 +120,7 @@ void CalDAVBackend::processNextItemLoad()
     QString calId = m_itemFetchQueue.first();
     qDebug() << "CalDAVBackend: Processing loadItems for" << calId;
 
-    Cal *cal = getCal(calId);
+    Cal *cal = m_calMap.value(calId, nullptr);
     if (!cal) {
         qDebug() << "CalDAVBackend: No Cal found in m_calMap for" << calId;
         m_itemFetchQueue.removeFirst();
@@ -158,8 +155,7 @@ void CalDAVBackend::processNextItemLoad()
         KDAV::DavItem::List items = listJob->items();
         qDebug() << "CalDAVBackend: Listed" << items.size() << "items for" << calId;
         if (items.isEmpty()) {
-            emit itemsLoaded(cal, QList<QSharedPointer<CalendarItem>>());
-            emit dataLoaded();
+            emit calendarLoaded(cal);
             m_itemFetchQueue.removeFirst();
             processNextItemLoad();
             return;
@@ -182,7 +178,6 @@ void CalDAVBackend::processNextItemLoad()
                 KDAV::DavItem::List fetchedItems = fJob->items();
                 qDebug() << "CalDAVBackend: MULTIGET fetched" << fetchedItems.size() << "items for" << calId;
 
-                QList<QSharedPointer<CalendarItem>> result;
                 KCalendarCore::ICalFormat format;
                 for (const KDAV::DavItem &item : fetchedItems) {
                     QByteArray rawData = item.data();
@@ -190,7 +185,6 @@ void CalDAVBackend::processNextItemLoad()
                         qDebug() << "CalDAVBackend: Empty data for" << item.url().toDisplayString() << "- skipping";
                         continue;
                     }
-                    //qDebug() << "CalDAVBackend: Raw data size:" << rawData.size() << "bytes" << rawData.left(100);
                     auto incidence = format.fromString(QString::fromUtf8(rawData));
                     if (!incidence) {
                         qDebug() << "CalDAVBackend: Failed to parse item" << item.url().toDisplayString();
@@ -206,23 +200,22 @@ void CalDAVBackend::processNextItemLoad()
                     }
                     if (calItem) {
                         calItem->setIncidence(incidence);
-                        result.append(calItem);
-                        //qDebug() << "CalDAVBackend: Added" << calItem->type() << calItem->id();
+                        emit itemLoaded(cal, calItem);
                     }
                 }
-
-                emit itemsLoaded(cal, result);
-                emit dataLoaded();
+                emit calendarLoaded(cal);
             }
             m_itemFetchQueue.removeFirst();
             processNextItemLoad();
         });
 
         qDebug() << "CalDAVBackend: Starting MULTIGET job for" << calId;
+        m_activeJobs.append(fetchJob); // Use append for QList
         fetchJob->start();
     });
 
     qDebug() << "CalDAVBackend: Starting items list job for" << calId << "Job:" << listJob;
+    m_activeJobs.append(listJob); // Use append for QList
     listJob->start();
 }
 
@@ -234,7 +227,12 @@ void CalDAVBackend::updateItem(const QString &calId, const QString &itemId, cons
 
 void CalDAVBackend::startSync(const QString &collectionId)
 {
-    qDebug() << "CalDAVBackend: Stub startSync for" << collectionId;
-    // Stub for Stage 1—full impl in Stage 2
-    emit syncCompleted(collectionId);
+    qDebug() << "CalDAVBackend: Starting sync for collection" << collectionId;
+    QList<CalendarMetadata> calendars = loadCalendars(collectionId); // Triggers async fetch
+    connect(this, &CalDAVBackend::calendarLoaded, this, [this, collectionId](Cal *cal) {
+        if (m_itemFetchQueue.isEmpty() && m_activeJobs.isEmpty()) {
+            qDebug() << "CalDAVBackend: Sync completed for" << collectionId;
+            emit syncCompleted(collectionId);
+        }
+    });
 }

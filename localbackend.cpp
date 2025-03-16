@@ -20,7 +20,6 @@ QList<CalendarMetadata> LocalBackend::loadCalendars(const QString &collectionId)
     QDir rootDir(m_rootPath);
     if (!rootDir.exists()) {
         qDebug() << "LocalBackend: Root directory does not exist:" << m_rootPath;
-        emit dataLoaded();
         return calendars;
     }
 
@@ -32,9 +31,7 @@ QList<CalendarMetadata> LocalBackend::loadCalendars(const QString &collectionId)
         qDebug() << "LocalBackend: Added calendar" << meta.id << meta.name;
     }
     qDebug() << "LocalBackend: Loaded" << calendars.size() << "calendars for collection" << collectionId;
-    emit calendarsLoaded(collectionId, calendars);
-    emit dataLoaded();
-    return calendars;
+    return calendars; // No signals here—let startSync handle it
 }
 
 QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
@@ -44,7 +41,6 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
     QString calId = cal->id();
     if (calId.isEmpty()) {
         qWarning() << "LocalBackend: Empty calId for calendar" << cal->name();
-        emit dataLoaded();
         return items;
     }
 
@@ -52,7 +48,6 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
     QDir calDir(calDirPath);
     if (!calDir.exists()) {
         qDebug() << "LocalBackend: No directory found for" << cal->name() << "at" << calDirPath;
-        emit dataLoaded();
         return items;
     }
 
@@ -61,7 +56,6 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
     KCalendarCore::ICalFormat format;
     for (const QString &fileName : icsFiles) {
         QString filePath = calDir.filePath(fileName);
-        //qDebug() << "LocalBackend: Processing file" << filePath;
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             qWarning() << "LocalBackend: Failed to open" << filePath << ":" << file.errorString();
@@ -74,8 +68,6 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
             qWarning() << "LocalBackend: Empty ICS data in" << filePath;
             continue;
         }
-       // qDebug() << "LocalBackend: Read" << icalData.size() << "bytes from" << filePath;
-      //  qDebug() << "LocalBackend: ICS data (snippet):" << icalData.left(200);
 
         KCalendarCore::MemoryCalendar::Ptr tempCalendar(new KCalendarCore::MemoryCalendar(QTimeZone::systemTimeZone()));
         if (!format.fromString(tempCalendar, icalData)) {
@@ -116,13 +108,10 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
         item->setEtag(""); // No ETag for local files
         items.append(item);
         m_idToPath[itemId] = filePath;
-        //qDebug() << "LocalBackend: Loaded" << item->type() << itemId << "from" << filePath;
     }
 
     qDebug() << "LocalBackend: Loaded" << items.size() << "items for calendar" << cal->name();
-    emit itemsLoaded(cal, items);
-    emit dataLoaded();
-    return items;
+    return items; // No signals here—let startSync handle it
 }
 
 void LocalBackend::startSync(const QString &collectionId)
@@ -132,18 +121,18 @@ void LocalBackend::startSync(const QString &collectionId)
     QList<CalendarMetadata> calendars = loadCalendars(collectionId);
     for (const CalendarMetadata &meta : calendars) {
         emit calendarDiscovered(collectionId, meta);
-        // Temporary Cal for loading—controller will manage the real one
-        Cal *tempCal = new Cal(meta.id, meta.name, nullptr);
-        QList<QSharedPointer<CalendarItem>> items = loadItems(tempCal);
+        Cal tempCal(meta.id, meta.name, nullptr); // Stack-allocated
+        QList<QSharedPointer<CalendarItem>> items = loadItems(&tempCal);
+        qDebug() << "LocalBackend: Loaded" << items.size() << "items for" << meta.id;
         for (const QSharedPointer<CalendarItem> &item : items) {
-            emit itemLoaded(tempCal, item);
+            emit itemLoaded(&tempCal, item);
         }
-        emit calendarLoaded(tempCal);
-        delete tempCal; // Clean up—controller owns the persisted Cal
+        emit calendarLoaded(&tempCal);
     }
 
     emit syncCompleted(collectionId);
 }
+
 void LocalBackend::storeCalendars(const QString &collectionId, const QList<Cal*> &calendars)
 {
     qDebug() << "LocalBackend: Storing calendars for collection" << collectionId << "with" << calendars.size() << "calendars";
@@ -168,7 +157,7 @@ void LocalBackend::storeCalendars(const QString &collectionId, const QList<Cal*>
         }
         qDebug() << "LocalBackend: Ensured directory for calendar" << cal->id() << "at" << calDirPath;
     }
-    emit dataLoaded();
+    // No dataLoaded—caller should handle completion
 }
 
 void LocalBackend::storeItems(Cal *cal, const QList<QSharedPointer<CalendarItem>> &items)
@@ -218,7 +207,7 @@ void LocalBackend::storeItems(Cal *cal, const QList<QSharedPointer<CalendarItem>
         }
         file.close();
     }
-    emit dataLoaded();
+    // No dataLoaded—caller should handle completion
 }
 
 void LocalBackend::updateItem(const QString &calId, const QString &itemId, const QString &icalData)
@@ -246,5 +235,5 @@ void LocalBackend::updateItem(const QString &calId, const QString &itemId, const
         qDebug() << "LocalBackend: Updated item" << fullId << "at" << filePath;
     }
     file.close();
-    emit dataLoaded();
+    // No dataLoaded—caller should handle completion
 }
