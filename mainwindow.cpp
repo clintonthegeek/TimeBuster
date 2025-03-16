@@ -55,10 +55,11 @@ void MainWindow::addCalendarView(Cal *cal)
 {
     CalendarView *view = new CalendarView(cal, this);
     QMdiSubWindow *subWindow = ui->mdiArea->addSubWindow(view);
+    subWindow->setWindowTitle(cal->name()); // Add this
     subWindow->setAttribute(Qt::WA_DeleteOnClose);
     subWindow->resize(400, 300);
     subWindow->show();
-    qDebug() << "MainWindow: Added subwindow for" << cal->id();
+    qDebug() << "MainWindow: Added subwindow for" << cal->id() << "titled" << cal->name();
 }
 
 void MainWindow::addLocalCollection()
