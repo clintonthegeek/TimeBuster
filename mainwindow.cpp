@@ -29,7 +29,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionNewRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
     connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
-    connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
     connect(collectionController, &CollectionController::calendarAdded, this, &MainWindow::addCalendarView);
     connect(collectionController, &CollectionController::calendarsLoaded, this, &MainWindow::onCalendarsLoaded);
     connect(collectionController, &CollectionController::itemsLoaded, this, &MainWindow::onItemsLoaded);

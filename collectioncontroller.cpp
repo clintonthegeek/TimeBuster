@@ -223,7 +223,7 @@ void CollectionController::onItemLoaded(Cal *tempCal, QSharedPointer<CalendarIte
         qWarning() << "CollectionController: No real Cal for" << tempCal->id() << "on item load";
         return;
     }
-    qDebug() << "CollectionController: Adding item" << item->id() << "to" << realCal->id();
+    // qDebug() << "CollectionController: Adding item" << item->id() << "to" << realCal->id();
     realCal->addItem(item);
     emit itemAdded(realCal, item);
 }
