@@ -32,6 +32,7 @@ add_library(TimeBusterCore SHARED
     calendaritemfactory.h calendaritemfactory.cpp
     DatabaseManager.h
     deltachange.h
+    backendinfo.h
 )
 
 target_link_libraries(TimeBusterCore

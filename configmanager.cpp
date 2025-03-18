@@ -27,44 +27,45 @@ QString ConfigManager::configPath(const QString &collectionId, const QString &ka
     return dir.filePath(collectionId + ".kalb");
 }
 
-bool ConfigManager::saveBackendConfig(const QString &collectionId, const QString &collectionName, const QList<SyncBackend*> &backends, const QString &kalbPath)
+QString ConfigManager::saveBackendConfig(const QString &collectionId, const QString &collectionName, const QList<BackendInfo> &backends, const QString &kalbPath)
 {
     QString path = configPath(collectionId, kalbPath);
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qDebug() << "ConfigManager: Failed to open file for writing:" << path;
-        return false;
+        return QString();
     }
 
     QXmlStreamWriter writer(&file);
     writer.setAutoFormatting(true);
     writer.writeStartDocument();
 
-    // Root element
     writer.writeStartElement("TimeBusterConfig");
 
-    // Collection element
     writer.writeStartElement("Collection");
     writer.writeTextElement("Id", collectionId);
     writer.writeTextElement("Name", collectionName);
     writer.writeEndElement(); // Collection
 
-    // Backends element
     writer.writeStartElement("Backends");
-    for (SyncBackend *backend : backends) {
+    for (const BackendInfo &info : backends) {
+        SyncBackend *backend = info.backend;
         writer.writeStartElement("Backend");
         if (LocalBackend *local = dynamic_cast<LocalBackend*>(backend)) {
             writer.writeAttribute("type", "local");
-            writer.writeTextElement("RootPath", local->rootPath());
-            writer.writeTextElement("priority", "1"); // Default priority for local
-            writer.writeTextElement("SyncOnOpen", "false"); // Default no sync
+            QString kalbDir = QFileInfo(path).absolutePath();
+            QString rootPath = local->rootPath();
+            QString relativePath = QDir(kalbDir).relativeFilePath(rootPath);
+            writer.writeTextElement("RootPath", relativePath.isEmpty() ? "." : relativePath);
+            writer.writeTextElement("priority", QString::number(info.priority));
+            writer.writeTextElement("SyncOnOpen", info.syncOnOpen ? "true" : "false");
         } else if (CalDAVBackend *caldav = dynamic_cast<CalDAVBackend*>(backend)) {
             writer.writeAttribute("type", "caldav");
             writer.writeTextElement("ServerUrl", caldav->serverUrl());
             writer.writeTextElement("Username", caldav->username());
             writer.writeTextElement("Password", caldav->password());
-            writer.writeTextElement("priority", "2"); // Default priority for caldav
-            writer.writeTextElement("SyncOnOpen", "false"); // Default no sync
+            writer.writeTextElement("priority", QString::number(info.priority));
+            writer.writeTextElement("SyncOnOpen", info.syncOnOpen ? "true" : "false");
         }
         writer.writeEndElement(); // Backend
     }
@@ -75,9 +76,8 @@ bool ConfigManager::saveBackendConfig(const QString &collectionId, const QString
 
     file.close();
     qDebug() << "ConfigManager: Saved config to" << path;
-    return true;
+    return path;
 }
-
 QList<SyncBackend*> ConfigManager::loadBackendConfig(const QString &collectionId, const QString &kalbPath)
 {
     QList<SyncBackend*> backends;
@@ -113,6 +113,7 @@ QVariantMap ConfigManager::loadConfig(const QString &collectionId, const QString
 
     QXmlStreamReader reader(&file);
     QVariantList backendsList;
+    QString kalbDir = QFileInfo(path).absolutePath(); // For relative path resolution
 
     while (!reader.atEnd() && !reader.hasError()) {
         reader.readNext();
@@ -132,14 +133,19 @@ QVariantMap ConfigManager::loadConfig(const QString &collectionId, const QString
                 ConfigManager::BackendConfig backend;
                 backend.type = reader.attributes().value("type").toString();
                 backend.details.clear();
-                backend.priority = 0; // Default priority
-                backend.syncOnOpen = false; // Default no sync
+                backend.priority = 0;
+                backend.syncOnOpen = false;
 
                 while (!(reader.isEndElement() && reader.name() == "Backend")) {
                     reader.readNext();
                     if (reader.isStartElement()) {
                         if (reader.name() == "RootPath") {
-                            backend.details["rootPath"] = reader.readElementText();
+                            QString rootPath = reader.readElementText();
+                            if (backend.type == "local") {
+                                backend.details["rootPath"] = QDir(kalbDir).filePath(rootPath);
+                            } else {
+                                backend.details["rootPath"] = rootPath;
+                            }
                         } else if (reader.name() == "ServerUrl") {
                             backend.details["serverUrl"] = reader.readElementText();
                         } else if (reader.name() == "Username") {

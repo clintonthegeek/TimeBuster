@@ -5,8 +5,7 @@
 #include <QMap>
 #include "collection.h"
 #include "syncbackend.h"
-
-class ConfigManager;
+#include "backendinfo.h"
 
 class CollectionController : public QObject
 {
@@ -16,15 +15,15 @@ public:
     explicit CollectionController(QObject *parent = nullptr);
     ~CollectionController() override;
 
-    void addCollection(const QString &name, SyncBackend *initialBackend = nullptr);
-    void attachLocalBackend(const QString &collectionId, SyncBackend *localBackend);
     const QMap<QString, QList<SyncBackend*>> &backends() const;
+    const QMap<QString, Collection*> &collections() const { return m_collections; }
     Collection *collection(const QString &id) const { return m_collections.value(id); }
     Cal *getCal(const QString &calId) const { return m_calMap.value(calId); }
+    bool isTransient(const QString &collectionId) const;
 
-    bool loadCollection(const QString &kalbPath);
-    bool saveCollection(const QString &kalbPath, const QString &collectionId);
-    const QMap<QString, Collection*> &collections() const { return m_collections; }
+    void loadCollection(const QString &name, SyncBackend *initialBackend = nullptr, bool isTransient = false, const QString &kalbPath = QString());
+    bool saveCollection(const QString &collectionId, const QString &kalbPath = QString());
+    void attachLocalBackend(const QString &collectionId, SyncBackend *localBackend);
 
 signals:
     void collectionAdded(Collection *collection);
@@ -45,18 +44,13 @@ private slots:
     void onSyncCompleted(const QString &collectionId);
 
 private:
-    struct BackendInfo {
-        SyncBackend *backend;
-        int priority;
-        bool syncOnOpen;
-    };
-
     QMap<QString, Collection*> m_collections;
     QMap<QString, QList<BackendInfo>> m_backends;
     QMap<QString, Cal*> m_calMap;
     QMap<QString, int> m_pendingDataLoads;
-    QMap<QString, int> m_pendingSyncs; // For new sync flow
+    QMap<QString, int> m_pendingSyncs;
     int m_collectionCounter;
+    QMap<QString, QString> m_collectionToKalbPath;
 };
 
 #endif // COLLECTIONCONTROLLER_H

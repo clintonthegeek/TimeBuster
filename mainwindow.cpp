@@ -9,6 +9,7 @@
 #include <QFileDialog>
 #include <QMenu>
 #include <QProgressBar>
+#include <QMessageBox>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), credentialsDialog(new CredentialsDialog(this)),
@@ -28,20 +29,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionNewLocalCollection, &QAction::triggered, this, &MainWindow::addLocalCollection);
     connect(ui->actionNewRemoteCollection, &QAction::triggered, this, &MainWindow::addRemoteCollection);
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
+    connect(ui->actionSaveCollection, &QAction::triggered, this, &MainWindow::onSaveCollection);
     connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
     connect(collectionController, &CollectionController::calendarAdded, this, &MainWindow::addCalendarView);
     connect(collectionController, &CollectionController::calendarsLoaded, this, &MainWindow::onCalendarsLoaded);
     connect(collectionController, &CollectionController::itemsLoaded, this, &MainWindow::onItemsLoaded);
     connect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated);
     connect(ui->actionOpenCollection, &QAction::triggered, this, &MainWindow::onOpenCollection);
+    connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
 
-    // Setup Add Backend submenu
-    QMenu *addBackendMenu = new QMenu(this);
-    QAction *addLocalAction = addBackendMenu->addAction("🚧 Add &Local");
-    QAction *addRemoteAction = addBackendMenu->addAction("Add &Remote");
-    ui->actionAddBackend->setMenu(addBackendMenu);
-    connect(addLocalAction, &QAction::triggered, this, &MainWindow::addLocalBackend);
-    // addRemoteAction left unconnected for now (future 🚧)
+
 
     qDebug() << "MainWindow: Initialized";
 }
@@ -73,24 +70,22 @@ void MainWindow::addLocalCollection()
         ui->logTextEdit->append("Local collection creation canceled");
         return;
     }
-    Collection *col = new Collection("local0", "Local Collection", this); // ID will be set by controller
-    collectionController->addCollection("Local Collection", new LocalBackend(dir, this));
-    qDebug() << "MainWindow: Local collection added";
-    activeCollection = col;
+    collectionController->loadCollection("Local Collection", new LocalBackend(dir, this));
+    qDebug() << "MainWindow: Local collection loaded";
 }
 
 void MainWindow::addRemoteCollection()
 {
     if (credentialsDialog->exec() == QDialog::Accepted) {
-        ui->logTextEdit->append("Fetching remote calendars...");
+        ui->logTextEdit->append("Creating transient remote collection...");
         CalDAVBackend *backend = new CalDAVBackend(
             credentialsDialog->serverUrl(),
             credentialsDialog->username(),
             credentialsDialog->password(),
             this
             );
-        collectionController->addCollection("Remote Collection", backend);
-        ui->logTextEdit->append("Added remote collection - awaiting fetch");
+        collectionController->loadCollection("Remote Collection", backend, true);
+        ui->logTextEdit->append("Transient remote collection created");
     } else {
         ui->logTextEdit->append("Remote collection creation canceled");
     }
@@ -132,6 +127,71 @@ void MainWindow::onItemAdded(Cal *cal, QSharedPointer<CalendarItem> item)
                 break;
             }
         }
+    }
+}
+
+bool MainWindow::isCollectionTransient(const QString &collectionId) const
+{
+    return collectionController->isTransient(collectionId);
+}
+
+void MainWindow::onAddLocalBackend()
+{
+    if (!activeCollection) {
+        ui->logTextEdit->append("No active collection to add backend to");
+        return;
+    }
+
+    QString collectionId = activeCollection->id();
+    if (isCollectionTransient(collectionId)) {
+        QMessageBox::StandardButton reply = QMessageBox::question(
+            this,
+            tr("Save Collection"),
+            tr("This collection is transient and must be saved before adding a local backend. Save now?"),
+            QMessageBox::Yes | QMessageBox::No
+            );
+        if (reply == QMessageBox::Yes) {
+            QString filePath = QFileDialog::getSaveFileName(this, tr("Save Collection"), QDir::currentPath(), tr("KALB Files (*.kalb)"));
+            if (filePath.isEmpty()) {
+                ui->logTextEdit->append("Save canceled, local backend not added");
+                return;
+            }
+            if (!collectionController->saveCollection(collectionId, filePath)) {
+                ui->logTextEdit->append("Failed to save collection, local backend not added");
+                return;
+            }
+            ui->logTextEdit->append("Collection saved to " + filePath);
+        } else {
+            ui->logTextEdit->append("Local backend addition canceled for transient collection");
+            return;
+        }
+    }
+
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Select Local Backend Directory"), QDir::currentPath());
+    if (dir.isEmpty()) {
+        ui->logTextEdit->append("Local backend addition canceled");
+        return;
+    }
+    LocalBackend *backend = new LocalBackend(dir, this);
+    collectionController->attachLocalBackend(collectionId, backend);
+    ui->logTextEdit->append("Local backend added at " + dir);
+}
+
+void MainWindow::onSaveCollection()
+{
+    if (!activeCollection) {
+        ui->logTextEdit->append("No active collection to save");
+        return;
+    }
+    QString filePath = QFileDialog::getSaveFileName(this, tr("Save Collection"), QDir::currentPath(), tr("KALB Files (*.kalb)"));
+    if (filePath.isEmpty()) {
+        ui->logTextEdit->append("Save collection canceled");
+        return;
+    }
+    if (collectionController->saveCollection(activeCollection->id(), filePath)) {
+        ui->logTextEdit->append("Collection saved to " + filePath);
+    } else {
+        ui->logTextEdit->append("Failed to save collection to " + filePath);
     }
 }
 
@@ -205,6 +265,7 @@ void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
     }
 }
 
+
 void MainWindow::onOpenCollection()
 {
     qDebug() << "MainWindow: Opening collection";
@@ -214,18 +275,12 @@ void MainWindow::onOpenCollection()
         QDir::currentPath(),
         tr("KALB Files (*.kalb)")
         );
-
     if (filePath.isEmpty()) {
         ui->logTextEdit->append("Open collection canceled");
         qDebug() << "MainWindow: Open collection canceled by user";
         return;
     }
-
-    if (collectionController->loadCollection(filePath)) {
-        ui->logTextEdit->append("Collection loaded from " + filePath);
-        qDebug() << "MainWindow: Collection loaded successfully from" << filePath;
-    } else {
-        ui->logTextEdit->append("Failed to load collection from " + filePath);
-        qDebug() << "MainWindow: Failed to load collection from" << filePath;
-    }
+    collectionController->loadCollection("Loaded Collection", nullptr, false, filePath);
+    ui->logTextEdit->append("Collection loaded from " + filePath);
+    qDebug() << "MainWindow: Collection load requested from" << filePath;
 }

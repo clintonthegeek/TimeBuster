@@ -26,41 +26,136 @@ CollectionController::~CollectionController()
     m_collections.clear();
 }
 
-void CollectionController::addCollection(const QString &name, SyncBackend *initialBackend)
+void CollectionController::loadCollection(const QString &name, SyncBackend *initialBackend, bool isTransient, const QString &kalbPath)
 {
     QString id = QString("col%1").arg(m_collectionCounter++);
-    Collection *col = new Collection(id, name, this);
-    m_collections.insert(id, col);
 
-    connect(col, &Collection::calendarsChanged, this, [this, col]() {
-        qDebug() << "CollectionController: Calendars changed in" << col->id();
-        m_calMap.clear();
-        for (Collection *c : m_collections) {
-            for (Cal *cal : c->calendars()) {
-                m_calMap[cal->id()] = cal;
+    // Load from .kalb if provided
+    if (!kalbPath.isEmpty()) {
+        ConfigManager configManager(this);
+        QVariantMap config = configManager.loadConfig(id, kalbPath);
+        if (!config.isEmpty()) {
+            id = config["id"].toString();
+            QString loadedName = config["name"].toString();
+            QVariantList backendsList = config["backends"].toList();
+            QList<BackendInfo> loadedBackends;
+            for (const QVariant &backendVar : backendsList) {
+                ConfigManager::BackendConfig backendConfig = backendVar.value<ConfigManager::BackendConfig>();
+                BackendInfo info;
+                info.priority = backendConfig.priority;
+                info.syncOnOpen = backendConfig.syncOnOpen;
+                if (backendConfig.type == "local") {
+                    info.backend = new LocalBackend(backendConfig.details["rootPath"].toString(), this);
+                } else if (backendConfig.type == "caldav") {
+                    info.backend = new CalDAVBackend(
+                        backendConfig.details["serverUrl"].toString(),
+                        backendConfig.details["username"].toString(),
+                        backendConfig.details["password"].toString(),
+                        this
+                        );
+                }
+                loadedBackends.append(info);
             }
+            m_backends[id] = loadedBackends;
+            isTransient = false; // Loaded collections are persistent
+            m_collectionToKalbPath[id] = kalbPath;
+            qDebug() << "CollectionController: Parsed collection id:" << id << "name:" << loadedName;
+            Collection *col = new Collection(id, loadedName, this);
+            m_collections.insert(id, col);
+            connect(col, &Collection::calendarsChanged, this, [this]() {
+                m_calMap.clear();
+                for (Collection *c : m_collections) {
+                    for (Cal *cal : c->calendars()) {
+                        m_calMap[cal->id()] = cal;
+                    }
+                }
+            });
+            emit collectionAdded(col);
+        } else {
+            qDebug() << "CollectionController: Failed to load config from" << kalbPath;
+            return;
         }
-    });
-
-    if (initialBackend) {
-        BackendInfo info;
-        info.backend = initialBackend;
-        info.priority = 1;
-        info.syncOnOpen = false;
-        m_backends[id].append(info);
-        initialBackend->setParent(this);
-        connect(initialBackend, &SyncBackend::errorOccurred, this, [](const QString &error) {
-            qDebug() << "CollectionController: Error from backend:" << error;
+    } else {
+        // Create new collection if no .kalb path
+        Collection *col = new Collection(id, name, this);
+        m_collections.insert(id, col);
+        connect(col, &Collection::calendarsChanged, this, [this]() {
+            m_calMap.clear();
+            for (Collection *c : m_collections) {
+                for (Cal *cal : c->calendars()) {
+                    m_calMap[cal->id()] = cal;
+                }
+            }
         });
 
-        ConfigManager configManager(this);
-        configManager.saveBackendConfig(id, name, {initialBackend});
-
-        // No data load signals anymore—rely on explicit sync if needed
-        initialBackend->startSync(id); // Trigger sync instead of legacy loadCalendars
+        // Add initial backend if provided
+        if (initialBackend) {
+            BackendInfo info;
+            info.backend = initialBackend;
+            info.priority = 1;
+            info.syncOnOpen = true;
+            m_backends[id].append(info);
+            initialBackend->setParent(this);
+            if (!isTransient) { // Only save if not transient
+                ConfigManager configManager(this);
+                QList<BackendInfo> backendList = {info};
+                QString savedPath = configManager.saveBackendConfig(id, name, backendList);
+                if (!savedPath.isEmpty()) {
+                    m_collectionToKalbPath[id] = savedPath;
+                } else {
+                    qDebug() << "CollectionController: Failed to save non-transient collection" << id;
+                }
+            }
+        }
+        emit collectionAdded(col);
     }
 
-    emit collectionAdded(col);
+    // Connect signals and start sync for all backends with syncOnOpen
+    int syncCount = 0;
+    for (BackendInfo &info : m_backends[id]) {
+        SyncBackend *backend = info.backend;
+        connect(backend, &SyncBackend::errorOccurred, this, [](const QString &error) {
+            qDebug() << "CollectionController: Error from backend:" << error;
+        });
+        if (info.syncOnOpen) {
+            connect(backend, &SyncBackend::calendarDiscovered, this, &CollectionController::onCalendarDiscovered);
+            connect(backend, &SyncBackend::itemLoaded, this, &CollectionController::onItemLoaded);
+            connect(backend, &SyncBackend::calendarLoaded, this, &CollectionController::onCalendarLoaded);
+            connect(backend, &SyncBackend::syncCompleted, this, &CollectionController::onSyncCompleted);
+            syncCount++;
+            backend->startSync(id);
+        }
+    }
+    if (syncCount > 0) {
+        m_pendingSyncs[id] = syncCount;
+    }
+}
+
+bool CollectionController::saveCollection(const QString &collectionId, const QString &kalbPath)
+{
+    if (!m_collections.contains(collectionId)) {
+        qDebug() << "CollectionController: Collection" << collectionId << "not found";
+        return false;
+    }
+
+    Collection *col = m_collections.value(collectionId);
+    QList<BackendInfo> backends = m_backends.value(collectionId);
+
+    ConfigManager configManager(this);
+    QString savedPath = configManager.saveBackendConfig(collectionId, col->name(), backends, kalbPath);
+    if (!savedPath.isEmpty()) {
+        m_collectionToKalbPath[collectionId] = savedPath;
+        qDebug() << "CollectionController: Saved collection" << collectionId << "to" << savedPath;
+        return true;
+    } else {
+        qDebug() << "CollectionController: Failed to save collection" << collectionId;
+        return false;
+    }
+}
+
+bool CollectionController::isTransient(const QString &collectionId) const
+{
+    return !m_collectionToKalbPath.contains(collectionId);
 }
 
 void CollectionController::attachLocalBackend(const QString &collectionId, SyncBackend *localBackend)
@@ -70,15 +165,10 @@ void CollectionController::attachLocalBackend(const QString &collectionId, SyncB
         return;
     }
 
-    if (!localBackend) {
-        qDebug() << "CollectionController: Cannot attach null backend to collection" << collectionId;
-        return;
-    }
-
     BackendInfo info;
     info.backend = localBackend;
-    info.priority = 1; // Default priority for local
-    info.syncOnOpen = false; // Default no sync
+    info.priority = 2;
+    info.syncOnOpen = false;
     m_backends[collectionId].append(info);
     localBackend->setParent(this);
 
@@ -86,21 +176,24 @@ void CollectionController::attachLocalBackend(const QString &collectionId, SyncB
         qDebug() << "CollectionController: Error from backend:" << error;
     });
 
+    Collection *col = m_collections.value(collectionId);
     ConfigManager configManager(this);
-    Collection *collection = m_collections.value(collectionId);
-    QList<SyncBackend*> backendsToSave;
-    for (const BackendInfo &bInfo : m_backends[collectionId]) {
-        backendsToSave.append(bInfo.backend);
+    QString existingPath = m_collectionToKalbPath.value(collectionId);
+    QString updatedPath = configManager.saveBackendConfig(collectionId, col->name(), m_backends[collectionId], existingPath);
+    if (!updatedPath.isEmpty()) {
+        m_collectionToKalbPath[collectionId] = updatedPath;
+        qDebug() << "CollectionController: Updated .kalb with local backend at" << updatedPath;
+    } else {
+        qDebug() << "CollectionController: Failed to update .kalb for" << collectionId;
+        return;
     }
-    configManager.saveBackendConfig(collectionId, collection->name(), backendsToSave);
 
-    QList<Cal*> calendars = collection->calendars();
+    QList<Cal*> calendars = col->calendars();
     localBackend->storeCalendars(collectionId, calendars);
     for (Cal *cal : calendars) {
         localBackend->storeItems(cal, cal->items());
     }
-
-    qDebug() << "CollectionController: Attached LocalBackend to collection" << collectionId << "with" << calendars.size() << "calendars";
+    qDebug() << "CollectionController: Synced" << calendars.size() << "calendars to local backend";
 }
 
 const QMap<QString, QList<SyncBackend*>> &CollectionController::backends() const
@@ -115,80 +208,6 @@ const QMap<QString, QList<SyncBackend*>> &CollectionController::backends() const
         rawBackends[collectionId] = backendList;
     }
     return rawBackends;
-}
-
-
-bool CollectionController::loadCollection(const QString &kalbPath)
-{
-    ConfigManager configManager(this);
-    QVariantMap config = configManager.loadConfig(QString(), kalbPath);
-    if (config.isEmpty()) {
-        qDebug() << "CollectionController: Failed to load config from" << kalbPath;
-        return false;
-    }
-
-    QString collectionId = config.value("id").toString();
-    QString collectionName = config.value("name").toString();
-    qDebug() << "CollectionController: Parsed collection id:" << collectionId << "name:" << collectionName;
-
-    QVariantList backendsList = config.value("backends").toList();
-    qDebug() << "CollectionController: Found" << backendsList.size() << "backends in config";
-    QList<BackendInfo> backends;
-    for (const QVariant &backendVar : backendsList) {
-        ConfigManager::BackendConfig backendConfig = backendVar.value<ConfigManager::BackendConfig>();
-        BackendInfo info;
-        info.priority = backendConfig.priority;
-        info.syncOnOpen = backendConfig.syncOnOpen;
-
-        if (backendConfig.type == "local") {
-            info.backend = new LocalBackend(backendConfig.details.value("rootPath").toString(), this);
-        } else if (backendConfig.type == "caldav") {
-            info.backend = new CalDAVBackend(
-                backendConfig.details.value("serverUrl").toString(),
-                backendConfig.details.value("username").toString(),
-                backendConfig.details.value("password").toString(),
-                this
-                );
-        } else {
-            continue;
-        }
-        backends.append(info);
-    }
-
-    if (backends.isEmpty()) return false;
-
-    std::sort(backends.begin(), backends.end(), [](const BackendInfo &a, const BackendInfo &b) {
-        return a.priority < b.priority;
-    });
-
-    Collection *collection = new Collection(collectionId, collectionName, this);
-    m_collections.insert(collectionId, collection);
-    m_backends.insert(collectionId, backends);
-
-    int syncCount = 0;
-    for (BackendInfo &info : backends) {
-        if (info.syncOnOpen) {
-            qDebug() << "CollectionController: Connecting signals for backend with priority" << info.priority;
-            connect(info.backend, &SyncBackend::calendarDiscovered, this, &CollectionController::onCalendarDiscovered);
-            connect(info.backend, &SyncBackend::itemLoaded, this, &CollectionController::onItemLoaded, Qt::UniqueConnection);
-            connect(info.backend, &SyncBackend::calendarLoaded, this, &CollectionController::onCalendarLoaded);
-            connect(info.backend, &SyncBackend::syncCompleted, this, &CollectionController::onSyncCompleted);
-            connect(info.backend, &SyncBackend::errorOccurred, this, [](const QString &error) {
-                qDebug() << "CollectionController: Error from backend:" << error;
-            });
-            syncCount++;
-        }
-    }
-    m_pendingSyncs[collectionId] = syncCount;
-
-    emit collectionAdded(collection);
-
-    if (!backends.isEmpty() && backends.first().syncOnOpen) {
-        qDebug() << "CollectionController: Starting sync for backend with priority" << backends.first().priority;
-        backends.first().backend->startSync(collectionId);
-    }
-
-    return true;
 }
 
 void CollectionController::onDataLoaded()
@@ -254,26 +273,6 @@ void CollectionController::onSyncCompleted(const QString &collectionId)
     }
 }
 
-
-bool CollectionController::saveCollection(const QString &kalbPath, const QString &collectionId)
-{
-    qDebug() << "CollectionController: Saving collection" << collectionId << "to" << kalbPath;
-    if (!m_collections.contains(collectionId)) {
-        qDebug() << "CollectionController: Collection" << collectionId << "not found";
-        return false;
-    }
-
-    Collection *col = m_collections.value(collectionId);
-    ConfigManager configManager(this);
-    QList<SyncBackend*> backendsToSave;
-    for (const BackendInfo &info : m_backends.value(collectionId)) {
-        backendsToSave.append(info.backend);
-    }
-    configManager.saveBackendConfig(collectionId, col->name(), backendsToSave, kalbPath);
-
-    qDebug() << "CollectionController: Saved collection" << collectionId << "successfully";
-    return true;
-}
 
 
 void CollectionController::onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars)

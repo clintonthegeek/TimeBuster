@@ -4,6 +4,9 @@
 #include <QObject>
 #include <QList>
 #include "syncbackend.h"
+#include "backendinfo.h"
+
+class BackendInfo;
 
 class ConfigManager : public QObject
 {
@@ -11,7 +14,8 @@ class ConfigManager : public QObject
 public:
     explicit ConfigManager(QObject *parent = nullptr);
     void setBasePath(const QString &path);
-    bool saveBackendConfig(const QString &collectionId, const QString &collectionName, const QList<SyncBackend*> &backends, const QString &kalbPath = QString());
+    QString saveBackendConfig(const QString &collectionId, const QString &collectionName,
+                              const QList<BackendInfo> &backends, const QString &kalbPath = QString());
     QList<SyncBackend*> loadBackendConfig(const QString &collectionId, const QString &kalbPath = QString());
     QVariantMap loadConfig(const QString &collectionId, const QString &kalbPath = QString());
 
