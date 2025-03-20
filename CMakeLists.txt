@@ -30,7 +30,7 @@ add_library(TimeBusterCore SHARED
     databasemanager.h databasemanager.cpp
     sessionmanager.h sessionmanager.cpp
     calendaritemfactory.h calendaritemfactory.cpp
-    DatabaseManager.h
+
     deltachange.h
     backendinfo.h
 )
