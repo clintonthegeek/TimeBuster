@@ -35,7 +35,9 @@ private slots:
     void onCalendarLoaded(Cal *cal);
     void onSaveCollection();
     void onAddLocalBackend();
+
     void onSelectionChanged(); // New slot
+    void onApplyEdit(); // New slot
 
 private:
     void addCalendarView(Cal *cal);
@@ -49,6 +51,8 @@ private:
     CollectionController *collectionController;
     Collection *activeCollection;
     QString activeCal;
+
+    QSharedPointer<CalendarItem> currentItem; // New: Track the selected item
 };
 
 #endif // MAINWINDOW_H

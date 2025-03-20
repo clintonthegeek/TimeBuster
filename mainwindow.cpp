@@ -38,7 +38,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionOpenCollection, &QAction::triggered, this, &MainWindow::onOpenCollection);
     connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
 
-    connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
+    connect(ui->applyButton, &QPushButton::clicked, this, &MainWindow::onApplyEdit); // New connection
 
     qDebug() << "MainWindow: Initialized";
 }
@@ -179,23 +179,65 @@ void MainWindow::onAddLocalBackend()
     ui->logTextEdit->append("Local backend added at " + dir);
 }
 
-// New slot
+
 void MainWindow::onSelectionChanged()
 {
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
             if (view->model()->id() == activeCal) {
-                QSharedPointer<CalendarItem> item = view->selectedItem();
-                if (item) {
-                    ui->logTextEdit->append("Selected " + item->type() + ": " + item->incidence()->summary());
-                    qDebug() << "MainWindow: Selected item" << item->id() << "in" << activeCal;
+                currentItem = view->selectedItem();
+                if (currentItem) {
+                    ui->logTextEdit->append("Selected " + currentItem->type() + ": " + currentItem->incidence()->summary());
+                    ui->summaryEdit->setText(currentItem->incidence()->summary()); // Populate edit field
+                    qDebug() << "MainWindow: Selected item" << currentItem->id() << "in" << activeCal;
                 } else {
                     ui->logTextEdit->append("No item selected in " + activeCal);
+                    ui->summaryEdit->clear(); // Clear if no selection
+                    currentItem = nullptr;
                     qDebug() << "MainWindow: No item selected in" << activeCal;
                 }
                 return;
             }
         }
+    }
+}
+
+void MainWindow::onApplyEdit()
+{
+    if (!currentItem) {
+        ui->logTextEdit->append("No item selected to edit");
+        qDebug() << "MainWindow: Apply edit failed - no item selected";
+        return;
+    }
+
+    QString newSummary = ui->summaryEdit->text();
+    if (newSummary == currentItem->incidence()->summary()) {
+        ui->logTextEdit->append("No changes to apply");
+        qDebug() << "MainWindow: No changes to apply for" << currentItem->id();
+        return;
+    }
+
+    // Update the incidence
+    currentItem->incidence()->setSummary(newSummary);
+    currentItem->setDirty(true); // Mark as modified
+    Cal *cal = collectionController->getCal(activeCal);
+    if (cal) {
+        cal->updateItem(currentItem);
+        ui->logTextEdit->append("Updated " + currentItem->type() + ": " + newSummary);
+        qDebug() << "MainWindow: Updated item" << currentItem->id() << "with summary" << newSummary;
+
+        // Refresh the view
+        for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
+            if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+                if (view->model()->id() == activeCal) {
+                    view->refresh();
+                    break;
+                }
+            }
+        }
+    } else {
+        ui->logTextEdit->append("Error: Calendar not found for update");
+        qDebug() << "MainWindow: Calendar" << activeCal << "not found for update";
     }
 }
 
