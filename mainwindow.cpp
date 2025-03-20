@@ -38,7 +38,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionOpenCollection, &QAction::triggered, this, &MainWindow::onOpenCollection);
     connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
 
-
+    connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
 
     qDebug() << "MainWindow: Initialized";
 }
@@ -51,14 +51,16 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+// Update addCalendarView
 void MainWindow::addCalendarView(Cal *cal)
 {
     CalendarView *view = new CalendarView(cal, this);
     QMdiSubWindow *subWindow = ui->mdiArea->addSubWindow(view);
-    subWindow->setWindowTitle(cal->name()); // Add this
+    subWindow->setWindowTitle(cal->name());
     subWindow->setAttribute(Qt::WA_DeleteOnClose);
     subWindow->resize(400, 300);
     subWindow->show();
+    connect(view, &CalendarView::selectionChanged, this, &MainWindow::onSelectionChanged);
     qDebug() << "MainWindow: Added subwindow for" << cal->id() << "titled" << cal->name();
 }
 
@@ -175,6 +177,26 @@ void MainWindow::onAddLocalBackend()
     LocalBackend *backend = new LocalBackend(dir, this);
     collectionController->attachLocalBackend(collectionId, backend);
     ui->logTextEdit->append("Local backend added at " + dir);
+}
+
+// New slot
+void MainWindow::onSelectionChanged()
+{
+    for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
+        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+            if (view->model()->id() == activeCal) {
+                QSharedPointer<CalendarItem> item = view->selectedItem();
+                if (item) {
+                    ui->logTextEdit->append("Selected " + item->type() + ": " + item->incidence()->summary());
+                    qDebug() << "MainWindow: Selected item" << item->id() << "in" << activeCal;
+                } else {
+                    ui->logTextEdit->append("No item selected in " + activeCal);
+                    qDebug() << "MainWindow: No item selected in" << activeCal;
+                }
+                return;
+            }
+        }
+    }
 }
 
 void MainWindow::onSaveCollection()

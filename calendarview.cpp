@@ -31,3 +31,12 @@ void CalendarView::refresh()
     tableView->setModel(calModel); // Reattach to force refresh
     qDebug() << "CalendarView: Refreshed view for" << calModel->name();
 }
+
+QSharedPointer<CalendarItem> CalendarView::selectedItem() const
+{
+    QModelIndex index = tableView->currentIndex();
+    if (!index.isValid() || index.row() >= calModel->items().size()) {
+        return QSharedPointer<CalendarItem>(); // Null pointer if no selection
+    }
+    return calModel->items().at(index.row());
+}

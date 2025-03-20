@@ -15,6 +15,7 @@ public:
 
     Cal *model() const { return calModel; }
     QModelIndex currentIndex() const { return tableView->currentIndex(); }
+    QSharedPointer<CalendarItem> selectedItem() const; // New method
 
 public slots:
     void refresh(); // Already implemented, now a slot

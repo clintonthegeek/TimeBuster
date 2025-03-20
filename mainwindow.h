@@ -35,6 +35,7 @@ private slots:
     void onCalendarLoaded(Cal *cal);
     void onSaveCollection();
     void onAddLocalBackend();
+    void onSelectionChanged(); // New slot
 
 private:
     void addCalendarView(Cal *cal);
