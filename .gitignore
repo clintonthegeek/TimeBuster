@@ -84,6 +84,7 @@ CMakeLists.txt.user*
 
 
 ## clinton files
-.docs/
+docs/
+
 catAll.sh
 amalgamateSource.sh
