@@ -80,3 +80,10 @@ CMakeLists.txt.user*
 .rcc/
 .uic/
 /build*/
+.vscode/
+
+
+## clinton files
+.docs/
+catAll.sh
+amalgamateSource.sh
