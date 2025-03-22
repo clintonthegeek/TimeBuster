@@ -6,6 +6,7 @@
 #include "collectioncontroller.h"
 #include "credentialsdialog.h"
 #include "syncbackend.h"
+#include "sessionmanager.h" // New include
 
 class CollectionManager; // Already there
 class Cal;
@@ -49,6 +50,7 @@ private:
     CredentialsDialog *credentialsDialog;
     Ui::MainWindow *ui;
     CollectionController *collectionController;
+    SessionManager *sessionManager; // New member
     Collection *activeCollection;
     QString activeCal;
 

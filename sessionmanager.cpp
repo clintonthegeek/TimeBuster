@@ -13,6 +13,8 @@ SessionManager::SessionManager(CollectionController *controller, QObject *parent
 void SessionManager::queueDeltaChange(const QString &calId, const QSharedPointer<CalendarItem> &item, DeltaChange::Type change)
 {
     m_deltaChanges[calId].append(DeltaChange(change, item));
+    qDebug() << "SessionManager: Queued" << (change == DeltaChange::Modify ? "Modify" : change == DeltaChange::Add ? "Add" : "Remove")
+             << "change for item" << item->id() << "in calendar" << calId;
 }
 
 void SessionManager::applyDeltaChanges()
@@ -45,4 +47,3 @@ void SessionManager::applyDeltaChanges()
     }
     m_deltaChanges.clear();
 }
-

@@ -11,9 +11,11 @@
 #include <QProgressBar>
 #include <QMessageBox>
 
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), credentialsDialog(new CredentialsDialog(this)),
-    collectionController(new CollectionController(this)), activeCollection(nullptr)
+    collectionController(new CollectionController(this)), sessionManager(new SessionManager(collectionController, this)),
+    activeCollection(nullptr), currentItem(nullptr)
 {
     ui->setupUi(this);
 
@@ -225,6 +227,10 @@ void MainWindow::onApplyEdit()
         cal->updateItem(currentItem);
         ui->logTextEdit->append("Updated " + currentItem->type() + ": " + newSummary);
         qDebug() << "MainWindow: Updated item" << currentItem->id() << "with summary" << newSummary;
+
+        // Queue the delta change
+        sessionManager->queueDeltaChange(activeCal, currentItem, DeltaChange::Modify);
+        ui->logTextEdit->append("Staged change for " + currentItem->id());
 
         // Refresh the view
         for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
