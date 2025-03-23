@@ -28,13 +28,17 @@ void Cal::updateItem(const QSharedPointer<CalendarItem> &item)
     }
     for (int i = 0; i < m_items.size(); ++i) {
         if (m_items[i]->id() == item->id()) {
-            m_items[i] = item;
+            m_items[i] = item; // Replace with the new instance from delta
             emit dataChanged(index(i, 0), index(i, columnCount() - 1));
             qDebug() << "Cal: Updated item" << item->id() << "in" << m_id;
             return;
         }
     }
-    qDebug() << "Cal: Item" << item->id() << "not found for update in" << m_id;
+    // If not found, add it (could be a new item not in .ics yet)
+    beginInsertRows(QModelIndex(), m_items.size(), m_items.size());
+    m_items.append(item);
+    endInsertRows();
+    qDebug() << "Cal: Added missing item" << item->id() << "to" << m_id << "during update";
 }
 
 void Cal::removeItem(const QSharedPointer<CalendarItem> &item)

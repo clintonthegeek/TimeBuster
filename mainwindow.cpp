@@ -255,13 +255,18 @@ void MainWindow::onApplyEdit()
 void MainWindow::onAllSyncsCompleted(const QString &collectionId)
 {
     qDebug() << "MainWindow: All syncs completed for" << collectionId;
+    Collection *col = collectionController->collection(collectionId);
+    if (!col) {
+        qDebug() << "MainWindow: No collection found for" << collectionId;
+        return;
+    }
     sessionManager->loadStagedChanges(collectionId); // Loads and applies deltas
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
-            view->refresh(); // Repaint to show applied deltas
+            view->refresh();
         }
     }
-    ui->logTextEdit->append("Collection sync completed with " + QString::number(collectionController->collection(collectionId)->calendars().size()) + " calendars");
+    ui->logTextEdit->append("Collection sync completed with " + QString::number(col->calendars().size()) + " calendars");
 }
 
 void MainWindow::onSaveCollection()

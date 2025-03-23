@@ -112,14 +112,18 @@ void SessionManager::loadStagedChanges(const QString &collectionId)
             deltas.append(delta);
         }
         m_deltaChanges[calId] = deltas;
+    }
+    file.close();
+    qDebug() << "SessionManager: Loaded" << m_deltaChanges.size() << "calendars with staged changes from" << filePath;
 
-        // Apply deltas to Cal immediately
+    // Apply deltas after loading
+    for (const QString &calId : m_deltaChanges.keys()) {
         Cal *cal = m_collectionController->getCal(calId);
         if (!cal) {
             qDebug() << "SessionManager: No calendar found for" << calId << "while applying staged changes";
             continue;
         }
-        for (const DeltaChange &delta : deltas) {
+        for (const DeltaChange &delta : m_deltaChanges[calId]) {
             if (delta.change() == DeltaChange::Add) {
                 cal->addItem(delta.getItem());
                 qDebug() << "SessionManager: Applied staged add for item" << delta.getItem()->id() << "to" << calId;
@@ -132,8 +136,7 @@ void SessionManager::loadStagedChanges(const QString &collectionId)
             }
         }
     }
-    file.close();
-    qDebug() << "SessionManager: Loaded and applied" << m_deltaChanges.size() << "calendars with staged changes from" << filePath;
+    qDebug() << "SessionManager: Applied all staged changes for collection" << collectionId;
 }
 
 void SessionManager::saveToFile(const QString &collectionId)

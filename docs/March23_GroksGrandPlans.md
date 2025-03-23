@@ -59,6 +59,7 @@ Here’s a quick recap of each direction, with thoughts on their ordering based 
 13. **Undo/Redo**  
     - *Recap*: Use `SessionManager::m_deltaChanges` as undo stack, add redo stack.  
     - *Order*: With `StagePane`—deltas are key.
+    - Clinton notes: Must dovetail nicely with more natural undo/redo stack of text edits within text widgets, etc. 
 
 14. **Config Management UI**  
     - *Recap*: Dialog for `ConfigManager` to manage backend settings.  
