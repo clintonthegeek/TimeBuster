@@ -270,6 +270,7 @@ void CollectionController::onSyncCompleted(const QString &collectionId)
         qDebug() << "CollectionController: All backends completed for" << collectionId;
         m_pendingSyncs.remove(collectionId);
         emit loadingProgress(100); // Stub for Stage 1
+        emit allSyncsCompleted(collectionId); // Emit new signal
     }
 }
 

@@ -36,11 +36,15 @@ MainWindow::MainWindow(QWidget *parent)
     connect(collectionController, &CollectionController::calendarAdded, this, &MainWindow::addCalendarView);
     connect(collectionController, &CollectionController::calendarsLoaded, this, &MainWindow::onCalendarsLoaded);
     connect(collectionController, &CollectionController::itemsLoaded, this, &MainWindow::onItemsLoaded);
+    connect(collectionController, &CollectionController::allSyncsCompleted, this, &MainWindow::onAllSyncsCompleted);
     connect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated);
     connect(ui->actionOpenCollection, &QAction::triggered, this, &MainWindow::onOpenCollection);
     connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
 
+
+    //editing buttons
     connect(ui->applyButton, &QPushButton::clicked, this, &MainWindow::onApplyEdit); // New connection
+    connect(ui->actionCommitChanges, &QAction::triggered, this, &MainWindow::onCommitChanges); // New connection
 
     qDebug() << "MainWindow: Initialized";
 }
@@ -247,6 +251,29 @@ void MainWindow::onApplyEdit()
     }
 }
 
+/*
+void MainWindow::onBackendsCompleted(const QString &collectionId) // New slot
+{
+    qDebug() << "MainWindow: All backends completed for" << collectionId;
+    sessionManager->loadStagedChanges(collectionId);
+    for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
+        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+            view->refresh();
+        }
+    }
+}
+*/
+void MainWindow::onAllSyncsCompleted(const QString &collectionId)
+{
+    qDebug() << "MainWindow: All syncs completed for" << collectionId;
+    sessionManager->loadStagedChanges(collectionId);
+    for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
+        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+            view->refresh();
+        }
+    }
+}
+
 void MainWindow::onSaveCollection()
 {
     if (!activeCollection) {
@@ -293,24 +320,18 @@ void MainWindow::onCollectionAdded(Collection *collection)
 
 void MainWindow::onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars)
 {
+    Q_UNUSED(collectionId);
     Q_UNUSED(calendars);
-    if (activeCollection && activeCollection->id() == collectionId) {
-        for (Cal *cal : activeCollection->calendars()) {
-            if (cal->id() == "cal1") continue;
-            addCalendarView(cal);
-        }
-    }
+    // Called after calendars are loaded, but before items
 }
 
 void MainWindow::onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items)
 {
     Q_UNUSED(items);
-    qDebug() << "MainWindow: onItemsLoaded for" << cal->id() << "with" << items.size() << "items";
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
             if (view->model()->id() == cal->id()) {
                 view->refresh();
-                qDebug() << "MainWindow: Refreshed view for" << cal->name();
             }
         }
     }
@@ -353,4 +374,24 @@ void MainWindow::onOpenCollection()
     collectionController->loadCollection("Loaded Collection", nullptr, false, filePath);
     ui->logTextEdit->append("Collection loaded from " + filePath);
     qDebug() << "MainWindow: Collection load requested from" << filePath;
+}
+
+void MainWindow::onCommitChanges()
+{
+    if (!activeCollection) {
+        ui->logTextEdit->append("No active collection to commit changes");
+        qDebug() << "MainWindow: No active collection for commit";
+        return;
+    }
+
+    sessionManager->applyDeltaChanges(); // Fixed: Removed erroneous if condition syntax
+    ui->logTextEdit->append("Committed staged changes to backends");
+    qDebug() << "MainWindow: Committed changes for collection" << activeCollection->id();
+
+    // Refresh all views
+    for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
+        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+            view->refresh();
+        }
+    }
 }

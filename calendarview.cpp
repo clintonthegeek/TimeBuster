@@ -40,3 +40,4 @@ QSharedPointer<CalendarItem> CalendarView::selectedItem() const
     }
     return calModel->items().at(index.row());
 }
+

@@ -39,6 +39,12 @@ private slots:
 
     void onSelectionChanged(); // New slot
     void onApplyEdit(); // New slot
+    void onCommitChanges(); // New slot
+
+    //gone?
+//    void onBackendsCompleted(const QString &collectionId); // New slot
+
+    void onAllSyncsCompleted(const QString &collectionId); // New slot
 
 private:
     void addCalendarView(Cal *cal);

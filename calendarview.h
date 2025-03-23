@@ -19,6 +19,7 @@ public:
 
 public slots:
     void refresh(); // Already implemented, now a slot
+//    void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
 
 signals:
     void selectionChanged(); // For selection changes

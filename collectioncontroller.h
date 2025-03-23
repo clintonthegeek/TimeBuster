@@ -28,11 +28,13 @@ public:
 signals:
     void collectionAdded(Collection *collection);
     void calendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars);
-    void itemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items);
+    void itemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items); // Legacy
+    void allSyncsCompleted(const QString &collectionId); // New signal
     void calendarAdded(Cal *cal);
     void itemAdded(Cal *cal, QSharedPointer<CalendarItem> item);
     void calendarLoaded(Cal *cal);
     void loadingProgress(int progress);
+    void allBackendsCompleted(const QString &collectionId);
 
 private slots:
     void onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars);
