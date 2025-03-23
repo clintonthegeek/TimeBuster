@@ -41,9 +41,7 @@ private slots:
     void onApplyEdit(); // New slot
     void onCommitChanges(); // New slot
 
-    //gone?
-//    void onBackendsCompleted(const QString &collectionId); // New slot
-
+    void onCalendarAdded(Cal *cal); // New slot
     void onAllSyncsCompleted(const QString &collectionId); // New slot
 
 private:

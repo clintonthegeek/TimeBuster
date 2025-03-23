@@ -10,11 +10,8 @@ CalendarView::CalendarView(Cal *cal, QWidget *parent)
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(tableView);
     setLayout(layout);
-
-    // Connect selection changes to emit our signal
-    connect(tableView->selectionModel(), &QItemSelectionModel::selectionChanged,
-            this, &CalendarView::selectionChanged);
-
+    bool connected = connect(tableView->selectionModel(), &QItemSelectionModel::selectionChanged,
+                             this, &CalendarView::selectionChanged);
     // Basic sizing - adjustable later
     resize(400, 300);
 }
@@ -27,8 +24,9 @@ CalendarView::~CalendarView()
 
 void CalendarView::refresh()
 {
-    tableView->setModel(nullptr); // Detach model
-    tableView->setModel(calModel); // Reattach to force refresh
+    //tableView->setModel(nullptr); // Detach model
+    //tableView->setModel(calModel); // Reattach to force refresh
+    tableView->viewport()->update(); // Just repaint
     qDebug() << "CalendarView: Refreshed view for" << calModel->name();
 }
 

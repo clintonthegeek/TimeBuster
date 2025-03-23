@@ -29,7 +29,7 @@ void Cal::updateItem(const QSharedPointer<CalendarItem> &item)
     for (int i = 0; i < m_items.size(); ++i) {
         if (m_items[i]->id() == item->id()) {
             m_items[i] = item;
-            emit itemsChanged();
+            emit dataChanged(index(i, 0), index(i, columnCount() - 1));
             qDebug() << "Cal: Updated item" << item->id() << "in" << m_id;
             return;
         }
@@ -45,8 +45,9 @@ void Cal::removeItem(const QSharedPointer<CalendarItem> &item)
     }
     for (int i = 0; i < m_items.size(); ++i) {
         if (m_items[i]->id() == item->id()) {
+            beginRemoveRows(QModelIndex(), i, i);
             m_items.removeAt(i);
-            emit itemsChanged();
+            endRemoveRows();
             qDebug() << "Cal: Removed item" << item->id() << "from" << m_id;
             return;
         }
@@ -104,4 +105,3 @@ QVariant Cal::headerData(int section, Qt::Orientation orientation, int role) con
     default: return QVariant();
     }
 }
-

@@ -33,7 +33,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
     connect(ui->actionSaveCollection, &QAction::triggered, this, &MainWindow::onSaveCollection);
     connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
-    connect(collectionController, &CollectionController::calendarAdded, this, &MainWindow::addCalendarView);
+    connect(collectionController, &CollectionController::calendarAdded, this, &MainWindow::onCalendarAdded); // Use this instead
     connect(collectionController, &CollectionController::calendarsLoaded, this, &MainWindow::onCalendarsLoaded);
     connect(collectionController, &CollectionController::itemsLoaded, this, &MainWindow::onItemsLoaded);
     connect(collectionController, &CollectionController::allSyncsCompleted, this, &MainWindow::onAllSyncsCompleted);
@@ -188,6 +188,7 @@ void MainWindow::onAddLocalBackend()
 
 void MainWindow::onSelectionChanged()
 {
+    qDebug() << "MainWindow: onSelectionChanged called, activeCal =" << activeCal;
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
             if (view->model()->id() == activeCal) {
@@ -251,27 +252,16 @@ void MainWindow::onApplyEdit()
     }
 }
 
-/*
-void MainWindow::onBackendsCompleted(const QString &collectionId) // New slot
-{
-    qDebug() << "MainWindow: All backends completed for" << collectionId;
-    sessionManager->loadStagedChanges(collectionId);
-    for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
-        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
-            view->refresh();
-        }
-    }
-}
-*/
 void MainWindow::onAllSyncsCompleted(const QString &collectionId)
 {
     qDebug() << "MainWindow: All syncs completed for" << collectionId;
-    sessionManager->loadStagedChanges(collectionId);
+    sessionManager->loadStagedChanges(collectionId); // Loads and applies deltas
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
-            view->refresh();
+            view->refresh(); // Repaint to show applied deltas
         }
     }
+    ui->logTextEdit->append("Collection sync completed with " + QString::number(collectionController->collection(collectionId)->calendars().size()) + " calendars");
 }
 
 void MainWindow::onSaveCollection()
@@ -306,16 +296,8 @@ void MainWindow::onCollectionAdded(Collection *collection)
         qDebug() << "MainWindow: No backends for collection" << collection->id();
         return;
     }
-
-    QSet<QString> fetchedCalendars;
-    for (Cal *cal : collection->calendars()) {
-        qDebug() << "MainWindow: Processing calendar" << cal->id() << cal->name();
-        if (fetchedCalendars.contains(cal->id())) continue;
-        fetchedCalendars.insert(cal->id());
-        addCalendarView(cal);
-    }
-    activeCal = collection->calendars().isEmpty() ? "" : collection->calendars().first()->id();
-    ui->logTextEdit->append("Collection fetched with " + QString::number(collection->calendars().size()) + " calendars");
+    // Don’t create views here—wait for calendarAdded
+    ui->logTextEdit->append("Collection opened: " + collection->name());
 }
 
 void MainWindow::onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars)
@@ -336,6 +318,16 @@ void MainWindow::onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> ite
         }
     }
 }
+
+void MainWindow::onCalendarAdded(Cal *cal) // New slot
+{
+    qDebug() << "MainWindow: onCalendarAdded for" << cal->id();
+    addCalendarView(cal);
+    if (activeCal.isEmpty()) {
+        activeCal = cal->id(); // Set first calendar as active
+    }
+}
+
 
 void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
 {
