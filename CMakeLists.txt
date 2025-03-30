@@ -33,6 +33,7 @@ add_library(TimeBusterCore SHARED
 
     deltachange.h
     backendinfo.h
+    viewinterface.h viewinterface.cpp
 )
 
 target_link_libraries(TimeBusterCore
