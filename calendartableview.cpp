@@ -79,3 +79,4 @@ void CalendarTableView::onSelectionChanged(const QItemSelection& selected, const
     emit itemSelected(items);
     qDebug() << "CalendarTableView: Emitted itemSelected for" << items.size() << "items in" << m_activeCal->id();
 }
+
