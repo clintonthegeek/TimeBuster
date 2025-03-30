@@ -356,13 +356,43 @@ void MainWindow::onCommitChanges()
         return;
     }
 
-    sessionManager->applyDeltaChanges(); // Redundant but safe—ensure latest state
-    // TODO: Add LocalBackend commit logic here (future step)
+    QMap<QString, QList<QSharedPointer<CalendarItem>>> itemsToCommit;
+    for (Cal *cal : activeCollection->calendars()) {
+        for (const QSharedPointer<CalendarItem> &item : cal->items()) {
+            if (item->isDirty()) {
+                itemsToCommit[cal->id()].append(item);
+                qDebug() << "MainWindow: Queued dirty item" << item->id() << "from" << cal->id() << "for commit";
+            }
+        }
+    }
+
+    if (itemsToCommit.isEmpty()) {
+        ui->logTextEdit->append("No changes to commit");
+        qDebug() << "MainWindow: No dirty items to commit for" << activeCollection->id();
+        return;
+    }
+
+    // Use CollectionController’s backends
+    const QMap<QString, QList<SyncBackend*>> &backends = collectionController->backends();
+    const QList<SyncBackend*> &collectionBackends = backends.value(activeCollection->id());
+    for (SyncBackend *backend : collectionBackends) {
+        for (const QString &calId : itemsToCommit.keys()) {
+            Cal *cal = collectionController->getCal(calId);
+            if (cal) {
+                backend->storeItems(cal, itemsToCommit[calId]);
+                qDebug() << "MainWindow: Committed" << itemsToCommit[calId].size() << "items to" << calId << "via backend";
+                for (const QSharedPointer<CalendarItem> &item : itemsToCommit[calId]) {
+                    item->setDirty(false);
+                }
+            }
+        }
+    }
+
     ui->logTextEdit->append("Committed staged changes to backends");
     qDebug() << "MainWindow: Committed changes for collection" << activeCollection->id();
 
-    // Clear deltas and file after commit
     sessionManager->clearDeltaChanges(activeCollection->id());
+
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
             view->refresh();
