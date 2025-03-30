@@ -38,6 +38,18 @@ public:
     virtual QString type() const = 0;
     virtual QVariant data(int role) const = 0;
 
+    // New getters/setters
+    virtual QDateTime dtStart() const = 0;
+    virtual void setDtStart(const QDateTime &dtStart) = 0;
+    virtual QDateTime dtEndOrDue() const = 0; // dtEnd for events, due for todos
+    virtual void setDtEndOrDue(const QDateTime &dtEndOrDue) = 0;
+    virtual QStringList categories() const = 0;
+    virtual void setCategories(const QStringList &categories) = 0;
+    virtual QString description() const = 0;
+    virtual void setDescription(const QString &description) = 0;
+    virtual bool allDay() const = 0;
+    virtual void setAllDay(bool allDay) = 0;
+
 protected:
     QString m_calId;
     QString m_itemId;
@@ -56,6 +68,17 @@ public:
     QVariant data(int role) const override;
     QString toICal() const override;
     CalendarItem* clone(QObject *parent = nullptr) const override;
+
+    QDateTime dtStart() const override;
+    void setDtStart(const QDateTime &dtStart) override;
+    QDateTime dtEndOrDue() const override;
+    void setDtEndOrDue(const QDateTime &dtEndOrDue) override;
+    QStringList categories() const override;
+    void setCategories(const QStringList &categories) override;
+    QString description() const override;
+    void setDescription(const QString &description) override;
+    bool allDay() const override;
+    void setAllDay(bool allDay) override;
 };
 
 class Todo : public CalendarItem
@@ -67,6 +90,18 @@ public:
     QVariant data(int role) const override;
     QString toICal() const override;
     CalendarItem* clone(QObject *parent = nullptr) const override;
+
+
+    QDateTime dtStart() const override;
+    void setDtStart(const QDateTime &dtStart) override;
+    QDateTime dtEndOrDue() const override;
+    void setDtEndOrDue(const QDateTime &dtEndOrDue) override;
+    QStringList categories() const override;
+    void setCategories(const QStringList &categories) override;
+    QString description() const override;
+    void setDescription(const QString &description) override;
+    bool allDay() const override;
+    void setAllDay(bool allDay) override;
 };
 
 #endif // CALENDARITEM_H

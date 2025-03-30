@@ -4,6 +4,11 @@
 #include "viewinterface.h"
 #include <QLineEdit>
 #include <QPushButton>
+#include <QDateTimeEdit>
+#include <QComboBox>
+#include <QTextEdit>
+#include <QCheckBox>
+#include <QFormLayout>
 
 class EditPane : public ViewInterface {
     Q_OBJECT
@@ -20,10 +25,17 @@ public slots:
 
 private slots:
     void onApplyClicked();
+    void onAllDayToggled(bool checked);
 
 private:
-    bool summariesDiffer() const; // New helper
+    bool summariesDiffer() const;
+    QFormLayout* m_layout;
     QLineEdit* m_summaryEdit;
+    QDateTimeEdit* m_dtStartEdit;
+    QDateTimeEdit* m_dtEndDueEdit; // Dual-purpose: dtEnd for events, due for todos
+    QComboBox* m_categoriesCombo;
+    QTextEdit* m_descriptionEdit;
+    QCheckBox* m_allDayCheck;
     QPushButton* m_applyButton;
     QList<QSharedPointer<CalendarItem>> m_items;
 };

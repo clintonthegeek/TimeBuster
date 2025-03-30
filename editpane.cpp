@@ -1,26 +1,45 @@
 #include "editpane.h"
-#include "sessionmanager.h"
 #include <QVBoxLayout>
-#include <QFormLayout>
-#include <QLabel>
 #include <QDebug>
-
+#include <QLabel> // Added for casting
 
 EditPane::EditPane(Collection* collection, QWidget* parent)
     : ViewInterface(collection, parent),
+    m_layout(new QFormLayout(this)),
     m_summaryEdit(new QLineEdit(this)),
+    m_dtStartEdit(new QDateTimeEdit(this)),
+    m_dtEndDueEdit(new QDateTimeEdit(this)),
+    m_categoriesCombo(new QComboBox(this)),
+    m_descriptionEdit(new QTextEdit(this)),
+    m_allDayCheck(new QCheckBox("All Day", this)),
     m_applyButton(new QPushButton("Apply", this)),
     m_items()
 {
-    QVBoxLayout* layout = new QVBoxLayout(this);
-    QFormLayout* form = new QFormLayout;
-    form->addRow(new QLabel("Summary:"), m_summaryEdit);
-    layout->addLayout(form);
-    layout->addWidget(m_applyButton);
-    layout->addStretch();
-    setLayout(layout);
+    // Setup widgets
+    m_dtStartEdit->setDisplayFormat("yyyy-MM-dd HH:mm");
+    m_dtEndDueEdit->setDisplayFormat("yyyy-MM-dd HH:mm");
+    m_categoriesCombo->setEditable(true);
+    m_categoriesCombo->addItems({"Work", "Personal", "Urgent", ""});
+    m_descriptionEdit->setMaximumHeight(100);
 
+    // Add to layout
+    m_layout->addRow("Summary:", m_summaryEdit);
+    m_layout->addRow("Start:", m_dtStartEdit);
+    m_layout->addRow("End/Due:", m_dtEndDueEdit); // Label will be adjusted dynamically
+    m_layout->addRow("Categories:", m_categoriesCombo);
+    m_layout->addRow("Description:", m_descriptionEdit);
+    m_layout->addRow("", m_allDayCheck);
+    m_layout->addRow("", m_applyButton);
+
+    // Connections
     connect(m_applyButton, &QPushButton::clicked, this, &EditPane::onApplyClicked);
+    connect(m_allDayCheck, &QCheckBox::toggled, this, &EditPane::onAllDayToggled);
+
+    // Initial state
+    setLayout(m_layout);
+    onAllDayToggled(false);
+    setEnabled(false);
+    qDebug() << "EditPane: Initialized";
 }
 
 EditPane::~EditPane()
@@ -30,84 +49,85 @@ EditPane::~EditPane()
 
 void EditPane::setActiveCal(Cal* cal)
 {
-    m_activeCal = cal; // Passive: doesn’t emit calChanged
-    qDebug() << "EditPane: Set activeCal to" << (cal ? cal->id() : "null");
+    if (m_activeCal != cal) {
+        m_activeCal = cal;
+        m_items.clear();
+        refresh();
+        emit calChanged(cal);
+        qDebug() << "EditPane: Set activeCal to" << (cal ? cal->id() : "null");
+    }
 }
 
 void EditPane::setCollection(Collection* collection)
 {
     ViewInterface::setCollection(collection);
-    m_items.clear(); // Reset selection when collection changes
+    m_items.clear();
     refresh();
     qDebug() << "EditPane: Cleared selection on collection change";
 }
 
-
 void EditPane::refresh()
 {
     if (m_items.isEmpty()) {
+        setEnabled(false);
         m_summaryEdit->clear();
-        m_applyButton->setEnabled(false);
-    } else if (m_items.size() == 1) {
-        m_summaryEdit->setText(m_items.first()->incidence()->summary());
-        m_applyButton->setEnabled(true);
+        m_dtStartEdit->setDateTime(QDateTime::currentDateTime());
+        m_dtEndDueEdit->setDateTime(QDateTime::currentDateTime().addSecs(3600));
+        m_categoriesCombo->setCurrentText("");
+        m_descriptionEdit->clear();
+        m_allDayCheck->setChecked(false);
     } else {
-        m_summaryEdit->setText(summariesDiffer() ? "<Multiple Items>" : m_items.first()->incidence()->summary());
-        m_applyButton->setEnabled(true); // Allow batch edit
+        setEnabled(true);
+        updateSelection(m_items);
     }
     qDebug() << "EditPane: Refreshed with" << m_items.size() << "items";
 }
 
 void EditPane::updateSelection(const QList<QSharedPointer<CalendarItem>>& items)
 {
-    if (!m_items.isEmpty() && m_summaryEdit->isModified()) {
-        SessionManager* session = qobject_cast<SessionManager*>(parent()->parent());
-        for (const auto& oldItem : m_items) {
-            if (session && session->resolver()->resolveUnappliedEdit(m_activeCal, oldItem, m_summaryEdit->text())) {
-                qDebug() << "EditPane: Resolved unapplied edit for" << oldItem->id();
-            } else {
-                qDebug() << "EditPane: Failed to resolve unapplied edit—discarded";
-            }
-        }
+    m_items = items;
+    if (items.isEmpty()) {
+        refresh();
+        return;
     }
 
-    m_items = items;
-    refresh();
+    setEnabled(true);
+    bool allEvents = true, allTodos = true;
+    for (const auto& item : items) {
+        if (item->type() != "Event") allEvents = false;
+        if (item->type() != "Todo") allTodos = false;
+    }
+
+    // Adjust label based on type
+    QLabel* endDueLabel = qobject_cast<QLabel*>(m_layout->labelForField(m_dtEndDueEdit));
+    if (endDueLabel) {
+        endDueLabel->setText(allTodos ? "Due:" : "End:");
+    } else {
+        qDebug() << "EditPane: Failed to cast end/due label to QLabel";
+    }
+
+    // TODO: Fill fields with item data (Milestone 3)
+    qDebug() << "EditPane: Updated selection with" << items.size() << "items";
+}
+
+void EditPane::onApplyClicked()
+{
+    qDebug() << "EditPane: Apply clicked—stub";
+}
+
+void EditPane::onAllDayToggled(bool checked)
+{
+    m_dtStartEdit->setDisplayFormat(checked ? "yyyy-MM-dd" : "yyyy-MM-dd HH:mm");
+    m_dtEndDueEdit->setDisplayFormat(checked ? "yyyy-MM-dd" : "yyyy-MM-dd HH:mm");
+    qDebug() << "EditPane: All Day toggled to" << checked;
 }
 
 bool EditPane::summariesDiffer() const
 {
     if (m_items.size() <= 1) return false;
-    QString firstSummary = m_items.first()->incidence()->summary();
-    for (const auto& item : m_items) {
-        if (item->incidence()->summary() != firstSummary) return true;
+    QString firstSummary = m_items[0]->incidence()->summary();
+    for (int i = 1; i < m_items.size(); ++i) {
+        if (m_items[i]->incidence()->summary() != firstSummary) return true;
     }
     return false;
-}
-
-void EditPane::onApplyClicked()
-{
-    if (m_items.isEmpty()) {
-        qDebug() << "EditPane: Apply clicked with no selection";
-        return;
-    }
-
-    QString newSummary = m_summaryEdit->text();
-    QList<QSharedPointer<CalendarItem>> modifiedItems;
-    for (const auto& item : m_items) {
-        if (newSummary != item->incidence()->summary()) {
-            item->incidence()->setSummary(newSummary);
-            item->setDirty(true);
-            if (m_activeCal) {
-                m_activeCal->updateItem(item);
-                modifiedItems.append(item);
-            }
-        }
-    }
-
-    if (!modifiedItems.isEmpty()) {
-        emit itemModified(modifiedItems);
-        qDebug() << "EditPane: Applied batch edit to" << modifiedItems.size() << "items in" << (m_activeCal ? m_activeCal->id() : "null");
-    }
-    m_summaryEdit->setModified(false);
 }
