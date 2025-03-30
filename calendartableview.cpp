@@ -39,6 +39,12 @@ void CalendarTableView::setActiveCal(Cal* cal)
     }
 }
 
+void CalendarTableView::setCollection(Collection* collection)
+{
+    ViewInterface::setCollection(collection);
+    // No additional action needed—cal drives the view
+}
+
 void CalendarTableView::refresh()
 {
     m_tableView->viewport()->update();

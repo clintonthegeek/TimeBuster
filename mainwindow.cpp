@@ -15,9 +15,21 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), credentialsDialog(new CredentialsDialog(this)),
     collectionController(new CollectionController(this)), sessionManager(new SessionManager(collectionController, this)),
-    activeCollection(nullptr), currentItem(nullptr)
+    activeCollection(nullptr), editPane(new EditPane(nullptr, this)), currentItem(nullptr)
 {
     ui->setupUi(this);
+
+    // Dock EditPane
+    ui->editDock->setWidget(editPane);
+
+    // Connect EditPane’s itemModified to SessionManager
+    connect(editPane, &EditPane::itemModified, sessionManager,
+            [this](const QList<QSharedPointer<CalendarItem>>& items) {
+                for (const auto& item : items) {
+                    sessionManager->queueDeltaChange(activeCal, item, DeltaChange::Modify);
+                    ui->logTextEdit->append("Staged change for " + item->id());
+                }
+            });
 
     // Status bar setup (adding as per previous discussion)
     QLabel *statusLabel = new QLabel("Ready", this);
@@ -40,10 +52,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated);
     connect(ui->actionOpenCollection, &QAction::triggered, this, &MainWindow::onOpenCollection);
     connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
-
-
-    //editing buttons
-    connect(ui->applyButton, &QPushButton::clicked, this, &MainWindow::onApplyEdit); // New connection
     connect(ui->actionCommitChanges, &QAction::triggered, this, &MainWindow::onCommitChanges); // New connection
 
     qDebug() << "MainWindow: Initialized";
@@ -57,7 +65,6 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-// Update addCalendarView
 void MainWindow::addCalendarView(Cal* cal)
 {
     CalendarTableView* view = new CalendarTableView(cal, this);
@@ -67,7 +74,7 @@ void MainWindow::addCalendarView(Cal* cal)
     subWindow->resize(400, 300);
     subWindow->show();
 
-    connect(view, &CalendarTableView::itemSelected, this, &MainWindow::onItemSelected);
+    connect(view, &CalendarTableView::itemSelected, editPane, &EditPane::updateSelection);
     connect(view, &CalendarTableView::itemModified, sessionManager,
             [this](const QList<QSharedPointer<CalendarItem>>& items) {
                 for (const auto& item : items) {
@@ -149,19 +156,9 @@ void MainWindow::onItemAdded(Cal *cal, QSharedPointer<CalendarItem> item)
 
 void MainWindow::onItemSelected(const QList<QSharedPointer<CalendarItem>>& items)
 {
-    if (items.isEmpty()) {
-        ui->summaryEdit->clear();
-        currentItem = nullptr;
-        qDebug() << "MainWindow: No items selected in" << activeCal;
-    } else if (items.size() == 1) {
-        currentItem = items.first();
-        ui->summaryEdit->setText(currentItem->incidence()->summary());
-        qDebug() << "MainWindow: Selected item" << currentItem->id() << "in" << activeCal;
-    } else {
-        ui->summaryEdit->setText("<Multiple Items>");
-        currentItem = nullptr;
-        qDebug() << "MainWindow: Multiple items selected in" << activeCal;
-    }
+    // No longer needed—EditPane handles this via updateSelection
+    // Keep as stub for now if needed for logging
+    qDebug() << "MainWindow: onItemSelected with" << items.size() << "items";
 }
 
 bool MainWindow::isCollectionTransient(const QString &collectionId) const
@@ -218,62 +215,13 @@ void MainWindow::onSelectionChanged()
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
             if (view->activeCal()->id() == activeCal) {
-                currentItem = view->selectedItem();
-                if (currentItem) {
-                    ui->logTextEdit->append("Selected " + currentItem->type() + ": " + currentItem->incidence()->summary());
-                    ui->summaryEdit->setText(currentItem->incidence()->summary());
-                    qDebug() << "MainWindow: Selected item" << currentItem->id() << "in" << activeCal;
-                } else {
-                    ui->logTextEdit->append("No item selected in " + activeCal);
-                    ui->summaryEdit->clear();
-                    currentItem = nullptr;
-                    qDebug() << "MainWindow: No item selected in" << activeCal;
-                }
+                editPane->updateSelection({view->selectedItem()}); // Bridge to EditPane
                 return;
             }
         }
     }
 }
 
-void MainWindow::onApplyEdit()
-{
-    if (!currentItem) {
-        ui->logTextEdit->append("No item selected to edit");
-        qDebug() << "MainWindow: Apply edit failed - no item selected";
-        return;
-    }
-
-    QString newSummary = ui->summaryEdit->text();
-    if (newSummary == currentItem->incidence()->summary()) {
-        ui->logTextEdit->append("No changes to apply");
-        qDebug() << "MainWindow: No changes to apply for" << currentItem->id();
-        return;
-    }
-
-    currentItem->incidence()->setSummary(newSummary);
-    currentItem->setDirty(true);
-    Cal *cal = collectionController->getCal(activeCal);
-    if (cal) {
-        cal->updateItem(currentItem);
-        ui->logTextEdit->append("Updated " + currentItem->type() + ": " + newSummary);
-        qDebug() << "MainWindow: Updated item" << currentItem->id() << "with summary" << newSummary;
-
-        sessionManager->queueDeltaChange(activeCal, currentItem, DeltaChange::Modify);
-        ui->logTextEdit->append("Staged change for " + currentItem->id());
-
-        for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
-            if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
-                if (view->activeCal()->id() == activeCal) {
-                    view->refresh();
-                    break;
-                }
-            }
-        }
-    } else {
-        ui->logTextEdit->append("Error: Calendar not found for update");
-        qDebug() << "MainWindow: Calendar" << activeCal << "not found for update";
-    }
-}
 
 void MainWindow::onAllSyncsCompleted(const QString &collectionId)
 {
@@ -319,12 +267,7 @@ void MainWindow::onCollectionAdded(Collection *collection)
 {
     qDebug() << "MainWindow: onCollectionAdded for" << collection->id();
     activeCollection = collection;
-    const auto backends = collectionController->backends();
-    if (!backends.contains(collection->id())) {
-        qDebug() << "MainWindow: No backends for collection" << collection->id();
-        return;
-    }
-    // Don’t create views here—wait for calendarAdded
+    editPane->setCollection(collection); // Just update collection
     ui->logTextEdit->append("Collection opened: " + collection->name());
 }
 
@@ -360,11 +303,13 @@ void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
 {
     if (!window) {
         activeCal = "";
+        editPane->setActiveCal(nullptr);
         qDebug() << "MainWindow: No active subwindow, cleared activeCal";
         return;
     }
     if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
         activeCal = view->activeCal()->id();
+        editPane->setActiveCal(view->activeCal());
         qDebug() << "MainWindow: Switched activeCal to" << activeCal;
         if (collectionController->getCal(activeCal)) {
             qDebug() << "MainWindow: Focused on" << activeCal;

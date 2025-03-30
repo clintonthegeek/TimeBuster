@@ -46,7 +46,6 @@ void SessionManager::applyDeltaChanges()
             qDebug() << "SessionManager: No backends for collection" << col->id();
             continue;
         }
-        // Find LocalBackend explicitly (temporary fix)
         SyncBackend *primaryBackend = nullptr;
         for (SyncBackend *backend : backends) {
             if (dynamic_cast<LocalBackend*>(backend)) {
@@ -59,20 +58,27 @@ void SessionManager::applyDeltaChanges()
             continue;
         }
 
+        QList<QSharedPointer<CalendarItem>> modifiedItems;
         for (const DeltaChange &delta : m_deltaChanges[calId]) {
             if (delta.change() == DeltaChange::Add) {
                 cal->addItem(delta.getItem());
+                modifiedItems.append(delta.getItem());
                 qDebug() << "SessionManager: Added item" << delta.getItem()->id() << "to calendar" << calId;
             } else if (delta.change() == DeltaChange::Modify) {
                 cal->updateItem(delta.getItem());
+                modifiedItems.append(delta.getItem());
                 qDebug() << "SessionManager: Modified item" << delta.getItem()->id() << "in calendar" << calId;
-                qDebug() << "SessionManager: Storing item" << delta.getItem()->id() << "to backend";
-                primaryBackend->storeItems(cal, {delta.getItem()});
             } else if (delta.change() == DeltaChange::Remove) {
                 cal->removeItem(delta.getItem());
                 qDebug() << "SessionManager: Removed item" << delta.getItem()->id() << "from calendar" << calId;
             }
             delta.getItem()->setDirty(false);
+        }
+
+        // Persist to backend
+        if (!modifiedItems.isEmpty()) {
+            primaryBackend->storeItems(cal, modifiedItems);
+            qDebug() << "SessionManager: Stored" << modifiedItems.size() << "items to LocalBackend for" << calId;
         }
     }
 

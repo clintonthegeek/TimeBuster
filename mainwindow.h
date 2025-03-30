@@ -6,7 +6,9 @@
 #include "collectioncontroller.h"
 #include "credentialsdialog.h"
 #include "syncbackend.h"
-#include "sessionmanager.h" // New include
+#include "sessionmanager.h"
+#include "editpane.h"
+
 
 class CollectionManager; // Already there
 class Cal;
@@ -38,7 +40,6 @@ private slots:
     void onAddLocalBackend();
 
     void onSelectionChanged(); // New slot
-    void onApplyEdit(); // New slot
     void onCommitChanges(); // New slot
 
     void onCalendarAdded(Cal *cal); // New slot
@@ -52,13 +53,13 @@ private:
     void onSubWindowActivated(QMdiSubWindow *window);
     bool isCollectionTransient(const QString &collectionId) const;
 
+    EditPane* editPane; // New member
     CredentialsDialog *credentialsDialog;
     Ui::MainWindow *ui;
     CollectionController *collectionController;
     SessionManager *sessionManager; // New member
     Collection *activeCollection;
     QString activeCal;
-
     QSharedPointer<CalendarItem> currentItem; // New: Track the selected item
 };
 

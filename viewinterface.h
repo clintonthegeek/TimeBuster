@@ -12,24 +12,21 @@ public:
     explicit ViewInterface(Collection* collection, QWidget* parent = nullptr);
     virtual ~ViewInterface() override = default;
 
-    // Pure virtual methods for all views
-    virtual void setActiveCal(Cal* cal) = 0; // Set or react to active calendar
-    virtual void refresh() = 0;              // Update display based on model changes
+    virtual void setActiveCal(Cal* cal) = 0;
+    virtual void refresh() = 0;
+    virtual void setCollection(Collection* collection); // New method
 
     Collection* collection() const { return m_collection; }
     Cal* activeCal() const { return m_activeCal; }
 
 signals:
-    // Proactive signals
-    void calChanged(Cal* cal);                         // Emitted when focus shifts
-    void itemSelected(QList<QSharedPointer<CalendarItem>> items); // Selection changed
-
-    // Shared signal for edits
-    void itemModified(QList<QSharedPointer<CalendarItem>> items); // Edit applied
+    void calChanged(Cal* cal);
+    void itemSelected(QList<QSharedPointer<CalendarItem>> items);
+    void itemModified(QList<QSharedPointer<CalendarItem>> items);
 
 protected:
-    Collection* m_collection; // Not owned, set by MainWindow or creator
-    Cal* m_activeCal;         // Current calendar context, may be null
+    Collection* m_collection;
+    Cal* m_activeCal;
 };
 
 #endif // VIEWINTERFACE_H

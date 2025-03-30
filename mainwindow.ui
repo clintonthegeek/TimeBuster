@@ -57,62 +57,21 @@
         </sizepolicy>
        </property>
       </widget>
-      <widget class="QWidget" name="editPane">
-       <layout class="QVBoxLayout" name="editLayout">
-        <item>
-         <layout class="QFormLayout" name="editForm">
-          <item row="0" column="0">
-           <widget class="QLabel" name="labelSummary">
-            <property name="text">
-             <string>Summary:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QLineEdit" name="summaryEdit"/>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="labelStart">
-            <property name="text">
-             <string>Start:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QDateTimeEdit" name="startEdit"/>
-          </item>
-          <item row="2" column="0">
-           <widget class="QLabel" name="labelEnd">
-            <property name="text">
-             <string>End/Due:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="1">
-           <widget class="QDateTimeEdit" name="endEdit"/>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="editButtonsLayout">
-          <item>
-           <widget class="QPushButton" name="applyButton">
-            <property name="text">
-             <string>Apply</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="cancelButton">
-            <property name="text">
-             <string>Cancel</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </widget>
+<widget class="QDockWidget" name="editDock">
+ <property name="features">
+  <set>QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetMovable|QDockWidget::DockWidgetFloatable</set>
+ </property>
+ <property name="allowedAreas">
+  <set>Qt::LeftDockWidgetArea|Qt::RightDockWidgetArea</set>
+ </property>
+ <property name="windowTitle">
+  <string>Edit</string>
+ </property>
+ <attribute name="dockWidgetArea">
+  <number>2</number> <!-- Right dock -->
+ </attribute>
+ <widget class="QWidget" name="editPanePlaceholder" /> <!-- Placeholder, replaced by EditPane -->
+</widget>
      </widget>
     </item>
    </layout>

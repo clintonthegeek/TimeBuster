@@ -6,3 +6,9 @@ ViewInterface::ViewInterface(Collection* collection, QWidget* parent)
 {
     qDebug() << "ViewInterface: Created for collection" << (collection ? collection->id() : "null");
 }
+
+void ViewInterface::setCollection(Collection* collection)
+{
+    m_collection = collection;
+    qDebug() << "ViewInterface: Set collection to" << (collection ? collection->id() : "null");
+}

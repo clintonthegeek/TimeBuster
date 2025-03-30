@@ -12,6 +12,7 @@ public:
 
     void setActiveCal(Cal* cal) override;
     void refresh() override;
+    void setCollection(Collection* collection) override; // New
 
     // Legacy method for compatibility
     QSharedPointer<CalendarItem> selectedItem() const;
