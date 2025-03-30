@@ -86,3 +86,10 @@ Okay, so multiselect: when a proactive `ViewInterface` begins a multiselection, 
 Okay! How is my reasoning here? Am I missing anything?
 
 Now, it may be possible to have passive "ViewInterface" MDI subwindows in some hypothetical future user workflow. They would just be closed automatically should the last active subwindow be closed.
+
+## future directions
+once all these goals are met, we can have so many interesting ways to play with individually and multiply-selected events. Two events can be swapped, three or more events can be carouselled forward or back. We can scramble them, group resize them or group move them.
+
+An entirely higher-level logic of program application can be built, which has semantic meaning for different calendars and categories. One calendar is just sleep schedule, perhaps. Or can feature *positively defined* "free time" blocks into which other calendars can schedule activities. Also locations—when I'm at the gym, I'm out, so I can buy groceries then. Etc. Etc. All a completely higher level of logic premised on the applications foundation. 
+
+It is in this higher level that styles will cascade from global settings, to collection, to calendars, to items, depending on categories or other property filters. 
