@@ -1,6 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "calendarview.h"
+#include "calendartableview.h"
 #include "collectioncontroller.h"
 #include "localbackend.h"
 #include "caldavbackend.h"
@@ -58,15 +58,23 @@ MainWindow::~MainWindow()
 }
 
 // Update addCalendarView
-void MainWindow::addCalendarView(Cal *cal)
+void MainWindow::addCalendarView(Cal* cal)
 {
-    CalendarView *view = new CalendarView(cal, this);
-    QMdiSubWindow *subWindow = ui->mdiArea->addSubWindow(view);
+    CalendarTableView* view = new CalendarTableView(cal, this);
+    QMdiSubWindow* subWindow = ui->mdiArea->addSubWindow(view);
     subWindow->setWindowTitle(cal->name());
     subWindow->setAttribute(Qt::WA_DeleteOnClose);
     subWindow->resize(400, 300);
     subWindow->show();
-    connect(view, &CalendarView::selectionChanged, this, &MainWindow::onSelectionChanged);
+
+    connect(view, &CalendarTableView::itemSelected, this, &MainWindow::onItemSelected);
+    connect(view, &CalendarTableView::itemModified, sessionManager,
+            [this](const QList<QSharedPointer<CalendarItem>>& items) {
+                for (const auto& item : items) {
+                    sessionManager->queueDeltaChange(activeCal, item, DeltaChange::Modify);
+                }
+            });
+
     qDebug() << "MainWindow: Added subwindow for" << cal->id() << "titled" << cal->name();
 }
 
@@ -120,6 +128,7 @@ void MainWindow::addLocalBackend()
     qDebug() << "MainWindow: Attached LocalBackend to" << activeCollection->id() << "at" << dir;
 }
 
+
 void MainWindow::syncCollections()
 {
     ui->logTextEdit->append("Sync Collections triggered (stub)");
@@ -128,13 +137,30 @@ void MainWindow::syncCollections()
 void MainWindow::onItemAdded(Cal *cal, QSharedPointer<CalendarItem> item)
 {
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
-        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
-            if (view->model()->id() == cal->id()) {
+        if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
+            if (view->activeCal()->id() == cal->id()) {
                 qDebug() << "MainWindow: Updating view for" << cal->id() << "with item" << item->id();
-                view->refresh(); // Temporary—Stage 2 will refine this
+                view->refresh();
                 break;
             }
         }
+    }
+}
+
+void MainWindow::onItemSelected(const QList<QSharedPointer<CalendarItem>>& items)
+{
+    if (items.isEmpty()) {
+        ui->summaryEdit->clear();
+        currentItem = nullptr;
+        qDebug() << "MainWindow: No items selected in" << activeCal;
+    } else if (items.size() == 1) {
+        currentItem = items.first();
+        ui->summaryEdit->setText(currentItem->incidence()->summary());
+        qDebug() << "MainWindow: Selected item" << currentItem->id() << "in" << activeCal;
+    } else {
+        ui->summaryEdit->setText("<Multiple Items>");
+        currentItem = nullptr;
+        qDebug() << "MainWindow: Multiple items selected in" << activeCal;
     }
 }
 
@@ -190,16 +216,16 @@ void MainWindow::onSelectionChanged()
 {
     qDebug() << "MainWindow: onSelectionChanged called, activeCal =" << activeCal;
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
-        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
-            if (view->model()->id() == activeCal) {
+        if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
+            if (view->activeCal()->id() == activeCal) {
                 currentItem = view->selectedItem();
                 if (currentItem) {
                     ui->logTextEdit->append("Selected " + currentItem->type() + ": " + currentItem->incidence()->summary());
-                    ui->summaryEdit->setText(currentItem->incidence()->summary()); // Populate edit field
+                    ui->summaryEdit->setText(currentItem->incidence()->summary());
                     qDebug() << "MainWindow: Selected item" << currentItem->id() << "in" << activeCal;
                 } else {
                     ui->logTextEdit->append("No item selected in " + activeCal);
-                    ui->summaryEdit->clear(); // Clear if no selection
+                    ui->summaryEdit->clear();
                     currentItem = nullptr;
                     qDebug() << "MainWindow: No item selected in" << activeCal;
                 }
@@ -224,23 +250,20 @@ void MainWindow::onApplyEdit()
         return;
     }
 
-    // Update the incidence
     currentItem->incidence()->setSummary(newSummary);
-    currentItem->setDirty(true); // Mark as modified
+    currentItem->setDirty(true);
     Cal *cal = collectionController->getCal(activeCal);
     if (cal) {
         cal->updateItem(currentItem);
         ui->logTextEdit->append("Updated " + currentItem->type() + ": " + newSummary);
         qDebug() << "MainWindow: Updated item" << currentItem->id() << "with summary" << newSummary;
 
-        // Queue the delta change
         sessionManager->queueDeltaChange(activeCal, currentItem, DeltaChange::Modify);
         ui->logTextEdit->append("Staged change for " + currentItem->id());
 
-        // Refresh the view
         for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
-            if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
-                if (view->model()->id() == activeCal) {
+            if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
+                if (view->activeCal()->id() == activeCal) {
                     view->refresh();
                     break;
                 }
@@ -262,7 +285,7 @@ void MainWindow::onAllSyncsCompleted(const QString &collectionId)
     }
     sessionManager->loadStagedChanges(collectionId); // Loads and applies deltas
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
-        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+        if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
             view->refresh();
         }
     }
@@ -316,8 +339,8 @@ void MainWindow::onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> ite
 {
     Q_UNUSED(items);
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
-        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
-            if (view->model()->id() == cal->id()) {
+        if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
+            if (view->activeCal()->id() == cal->id()) {
                 view->refresh();
             }
         }
@@ -333,7 +356,6 @@ void MainWindow::onCalendarAdded(Cal *cal) // New slot
     }
 }
 
-
 void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
 {
     if (!window) {
@@ -341,14 +363,13 @@ void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
         qDebug() << "MainWindow: No active subwindow, cleared activeCal";
         return;
     }
-    if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
-        activeCal = view->model()->id();
+    if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
+        activeCal = view->activeCal()->id();
         qDebug() << "MainWindow: Switched activeCal to" << activeCal;
         if (collectionController->getCal(activeCal)) {
             qDebug() << "MainWindow: Focused on" << activeCal;
         } else {
             qDebug() << "MainWindow: ActiveCal" << activeCal << "not found in m_calMap";
-            // Don’t clear activeCal here—m_calMap should be reliable now
         }
     }
 }
@@ -381,13 +402,12 @@ void MainWindow::onCommitChanges()
         return;
     }
 
-    sessionManager->applyDeltaChanges(); // Fixed: Removed erroneous if condition syntax
+    sessionManager->applyDeltaChanges();
     ui->logTextEdit->append("Committed staged changes to backends");
     qDebug() << "MainWindow: Committed changes for collection" << activeCollection->id();
 
-    // Refresh all views
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
-        if (CalendarView *view = qobject_cast<CalendarView*>(window->widget())) {
+        if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
             view->refresh();
         }
     }

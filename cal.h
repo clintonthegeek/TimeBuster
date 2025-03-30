@@ -20,6 +20,7 @@ public:
 
     QString id() const { return m_id; }
     QString name() const { return m_name; }
+    Collection* parentCollection() const { return m_parent; } // New getter
     void addItem(QSharedPointer<CalendarItem> item);
     QList<QSharedPointer<CalendarItem>> items() const { return m_items; }
     void updateItem(const QSharedPointer<CalendarItem> &item);
@@ -37,6 +38,7 @@ private:
     QString m_id;
     QString m_name;
     QList<QSharedPointer<CalendarItem>> m_items;
+    Collection* m_parent; // New member to store parent explicitly
 };
 
 #endif // CAL_H

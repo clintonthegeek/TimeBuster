@@ -52,11 +52,12 @@ QVariant Collection::headerData(int section, Qt::Orientation orientation, int ro
 
 void Collection::addCal(Cal *cal)
 {
+    if (!cal) return;
     beginInsertRows(QModelIndex(), m_calendars.size(), m_calendars.size());
     m_calendars.append(QSharedPointer<Cal>(cal));
-    cal->setParent(this); // Qt parenting for signals
     endInsertRows();
     emit calendarsChanged();
+    qDebug() << "Collection: Added calendar" << cal->id() << "to" << m_id;
 }
 
 QList<Cal*> Collection::calendars() const

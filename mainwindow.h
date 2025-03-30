@@ -46,6 +46,7 @@ private slots:
 
 private:
     void addCalendarView(Cal *cal);
+    void onItemSelected(const QList<QSharedPointer<CalendarItem>>& items); // New slot
     void onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars);
     void onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> items);
     void onSubWindowActivated(QMdiSubWindow *window);

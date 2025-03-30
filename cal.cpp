@@ -3,7 +3,7 @@
 #include <QDebug>
 
 Cal::Cal(const QString &id, const QString &name, Collection *parent)
-    : QAbstractTableModel(parent), m_id(id), m_name(name)
+    : QAbstractTableModel(parent), m_id(id), m_name(name), m_parent(parent)
 {
     qDebug() << "Cal: Created with id" << m_id << "name" << m_name;
 }
