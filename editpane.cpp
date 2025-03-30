@@ -57,12 +57,13 @@ void EditPane::refresh()
     }
     qDebug() << "EditPane: Refreshed with" << m_items.size() << "items";
 }
+
 void EditPane::updateSelection(const QList<QSharedPointer<CalendarItem>>& items)
 {
     if (!m_items.isEmpty() && m_summaryEdit->isModified()) {
         SessionManager* session = qobject_cast<SessionManager*>(parent()->parent());
         for (const auto& oldItem : m_items) {
-            if (session && session->resolver()->resolveUnappliedEdit(oldItem, m_summaryEdit->text())) {
+            if (session && session->resolver()->resolveUnappliedEdit(m_activeCal, oldItem, m_summaryEdit->text())) {
                 qDebug() << "EditPane: Resolved unapplied edit for" << oldItem->id();
             } else {
                 qDebug() << "EditPane: Failed to resolve unapplied edit—discarded";

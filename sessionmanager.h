@@ -21,12 +21,9 @@ public:
     class ChangeResolver {
     public:
         explicit ChangeResolver(SessionManager* parent) : m_session(parent) {}
-
-        // Returns true if resolved (applied or discarded), false if user must intervene
-        bool resolveUnappliedEdit(const QSharedPointer<CalendarItem>& item, const QString& newSummary);
-
+        bool resolveUnappliedEdit(Cal* cal, const QSharedPointer<CalendarItem>& item, const QString& newSummary);
     private:
-        SessionManager* m_session; // Access to m_deltaChanges, etc.
+        SessionManager* m_session;
     };
 
     ChangeResolver* resolver() { return &m_resolver; }
