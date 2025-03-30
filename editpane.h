@@ -13,7 +13,7 @@ public:
 
     void setActiveCal(Cal* cal) override;
     void refresh() override;
-    void setCollection(Collection* collection) override; // New
+    void setCollection(Collection* collection) override;
 
 public slots:
     void updateSelection(const QList<QSharedPointer<CalendarItem>>& items);
@@ -22,9 +22,10 @@ private slots:
     void onApplyClicked();
 
 private:
+    bool summariesDiffer() const; // New helper
     QLineEdit* m_summaryEdit;
     QPushButton* m_applyButton;
-    QList<QSharedPointer<CalendarItem>> m_items; // Current selection
+    QList<QSharedPointer<CalendarItem>> m_items;
 };
 
 #endif // EDITPANE_H
