@@ -34,7 +34,7 @@ public:
 
     struct Commit {
         QDateTime timestamp;
-        QList<DeltaChange> changes;
+        QMap<QString, QList<DeltaChange>> changesByCal; // MUST be this, not changes
     };
     QList<Commit> history() const { return m_history; }
 
