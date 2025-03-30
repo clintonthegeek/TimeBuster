@@ -31,12 +31,10 @@ add_library(TimeBusterCore SHARED
     sessionmanager.h sessionmanager.cpp
     calendaritemfactory.h calendaritemfactory.cpp
 
-    deltachange.h
     backendinfo.h
     viewinterface.h viewinterface.cpp
     calendartableview.h calendartableview.cpp
     editpane.h editpane.cpp
-    deltachange.cpp
     deltaentry.h
 )
 

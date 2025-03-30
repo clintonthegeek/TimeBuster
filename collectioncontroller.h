@@ -20,6 +20,7 @@ public:
     Collection *collection(const QString &id) const { return m_collections.value(id); }
     Cal *getCal(const QString &calId) const { return m_calMap.value(calId); }
     bool isTransient(const QString &collectionId) const;
+    QString kalbPath(const QString &collectionId) const { return m_collectionToKalbPath.value(collectionId); }
 
     void loadCollection(const QString &name, SyncBackend *initialBackend = nullptr, bool isTransient = false, const QString &kalbPath = QString());
     bool saveCollection(const QString &collectionId, const QString &kalbPath = QString());

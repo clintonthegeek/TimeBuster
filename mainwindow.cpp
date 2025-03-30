@@ -26,8 +26,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(editPane, &EditPane::itemModified, sessionManager,
             [this](const QList<QSharedPointer<CalendarItem>>& items) {
                 for (const auto& item : items) {
-                    sessionManager->queueDeltaChange(activeCal, item, DeltaChange::Modify);
-                    ui->logTextEdit->append("Staged change for " + item->id());
+                sessionManager->queueDeltaChange(activeCal, item, "modify");                    ui->logTextEdit->append("Staged change for " + item->id());
                 }
             });
 
@@ -78,7 +77,7 @@ void MainWindow::addCalendarView(Cal* cal)
     connect(view, &CalendarTableView::itemModified, sessionManager,
             [this](const QList<QSharedPointer<CalendarItem>>& items) {
                 for (const auto& item : items) {
-                    sessionManager->queueDeltaChange(activeCal, item, DeltaChange::Modify);
+                    sessionManager->queueDeltaChange(activeCal, item, "modify");
                 }
             });
 

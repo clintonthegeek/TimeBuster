@@ -7,20 +7,19 @@
 #include "syncbackend.h"
 #include "collectioncontroller.h"
 #include "collection.h"
-#include "deltachange.h"
+#include "deltaentry.h"
 
 class SessionManager : public QObject
 {
     Q_OBJECT
 public:
     explicit SessionManager(CollectionController *controller, QObject *parent = nullptr);
-    void queueDeltaChange(const QString &calId, const QSharedPointer<CalendarItem> &item, DeltaChange::Type change);
+    void queueDeltaChange(const QString &calId, const QSharedPointer<CalendarItem> &item, const QString &userIntent);
     void applyDeltaChanges();
     void loadStagedChanges(const QString &collectionId);
     void undoLastCommit();
     void redoLastUndo();
 
-    // Nested ChangeResolver
     class ChangeResolver {
     public:
         explicit ChangeResolver(SessionManager* parent) : m_session(parent) {}
@@ -31,29 +30,31 @@ public:
 
     ChangeResolver* resolver() { return &m_resolver; }
 
-
     struct Commit {
         QDateTime timestamp;
-        QMap<QString, QList<DeltaChange>> changesByCal; // MUST be this, not changes
+        QList<DeltaEntry> changes;
     };
     QList<Commit> history() const { return m_history; }
 
+signals:
+    void changesStaged(const QList<DeltaEntry> &changes);
+
 private:
-    void saveToFile(const QString &collectionId);
+    void saveToFile(const QString &collectionId, bool cleanExit = false);
     void saveHistory(const QString &collectionId);
     QString deltaFilePath(const QString &collectionId) const;
     QString historyFilePath(const QString &collectionId) const;
 
+    void saveDeltaEntries(const QString &collectionId);
+    QList<DeltaEntry> loadDeltaEntries(const QString &collectionId);
 
     CollectionController *m_collectionController;
-    QMap<QString, QList<DeltaChange>> m_deltaChanges;
+    QList<DeltaEntry> m_newDeltaChanges;
     QList<Commit> m_history;
-    QList<Commit> m_undoStack; // For redo
-    ChangeResolver m_resolver{this}; // Instance
+    QList<Commit> m_undoStack;
+    ChangeResolver m_resolver{this};
+    QString m_sessionId;
 };
-
-QDataStream &operator<<(QDataStream &out, const DeltaChange &delta); // New: Serialization
-QDataStream &operator>>(QDataStream &in, DeltaChange &delta);       // New: Deserialization
 
 QDataStream &operator<<(QDataStream &out, const SessionManager::Commit &commit);
 QDataStream &operator>>(QDataStream &in, SessionManager::Commit &commit);
