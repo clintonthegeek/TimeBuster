@@ -37,6 +37,7 @@ add_library(TimeBusterCore SHARED
     calendartableview.h calendartableview.cpp
     editpane.h editpane.cpp
     deltachange.cpp
+    deltaentry.h
 )
 
 target_link_libraries(TimeBusterCore
