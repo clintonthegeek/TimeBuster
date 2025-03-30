@@ -1,4 +1,5 @@
 #include "editpane.h"
+#include "sessionmanager.h"
 #include <QVBoxLayout>
 #include <QFormLayout>
 #include <QLabel>
@@ -60,10 +61,18 @@ void EditPane::refresh()
 void EditPane::updateSelection(const QList<QSharedPointer<CalendarItem>>& items)
 {
     if (!m_items.isEmpty() && m_summaryEdit->isModified()) {
-        qDebug() << "EditPane: Unapplied changes detected for" << m_items.first()->id();
-        // Stub for ChangeResolver in Milestone 4
-        // For now, just discard and proceed
+        QSharedPointer<CalendarItem> oldItem = m_items.first();
+        QString newSummary = m_summaryEdit->text();
+        qDebug() << "EditPane: Unapplied changes detected for" << oldItem->id();
+
+        SessionManager* session = qobject_cast<SessionManager*>(parent()->parent()); // MainWindow -> SessionManager
+        if (session && session->resolver()->resolveUnappliedEdit(oldItem, newSummary)) {
+            qDebug() << "EditPane: Resolved unapplied edit for" << oldItem->id();
+        } else {
+            qDebug() << "EditPane: Failed to resolve unapplied edit—discarded";
+        }
     }
+
     m_items = items;
     refresh();
 }

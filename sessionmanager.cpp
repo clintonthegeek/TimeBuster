@@ -201,3 +201,28 @@ QDataStream &operator>>(QDataStream &in, DeltaChange &delta)
     }
     return in;
 }
+
+bool SessionManager::ChangeResolver::resolveUnappliedEdit(const QSharedPointer<CalendarItem>& item, const QString& newSummary)
+{
+    if (!item || newSummary == item->incidence()->summary()) {
+        qDebug() << "ChangeResolver: No changes to resolve for" << (item ? item->id() : "null");
+        return true; // Nothing to do
+    }
+
+    // For Stage 1: Auto-apply and queue (no UI yet)
+    item->incidence()->setSummary(newSummary);
+    item->setDirty(true);
+    QString calId = item->calId();
+    Cal* cal = m_session->m_collectionController->getCal(calId);
+    if (cal) {
+        cal->updateItem(item);
+        m_session->queueDeltaChange(calId, item, DeltaChange::Modify);
+        qDebug() << "ChangeResolver: Auto-applied edit to" << item->id() << "in" << calId;
+        return true;
+    } else {
+        qDebug() << "ChangeResolver: No calendar found for" << calId << "—edit discarded";
+        return false; // Can’t apply, discard for now
+    }
+
+    // TODO: Stage 2—add UI escalation (e.g., QMessageBox::Apply/Discard/Cancel)
+}
