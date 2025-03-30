@@ -28,65 +28,67 @@ void SessionManager::queueDeltaChange(const QString &calId, const QSharedPointer
 void SessionManager::applyDeltaChanges()
 {
     qDebug() << "SessionManager: Applying delta changes";
+    Commit commit;
+    commit.timestamp = QDateTime::currentDateTime();
+
     for (const QString &calId : m_deltaChanges.keys()) {
         QString collectionId = calId.split("_").first();
         Collection *col = m_collectionController->collection(collectionId);
-        if (!col) {
-            qDebug() << "SessionManager: Collection for collectionId" << collectionId << "not found";
-            continue;
-        }
+        if (!col) continue;
         Cal *cal = m_collectionController->getCal(calId);
-        if (!cal) {
-            qDebug() << "SessionManager: No calendar found for" << calId;
-            continue;
-        }
-        const QMap<QString, QList<SyncBackend*>> &allBackends = m_collectionController->backends();
-        const QList<SyncBackend*> &backends = allBackends.value(col->id());
-        if (backends.isEmpty()) {
-            qDebug() << "SessionManager: No backends for collection" << col->id();
-            continue;
-        }
+        if (!cal) continue;
         SyncBackend *primaryBackend = nullptr;
-        for (SyncBackend *backend : backends) {
+        for (SyncBackend *backend : m_collectionController->backends().value(col->id())) {
             if (dynamic_cast<LocalBackend*>(backend)) {
                 primaryBackend = backend;
                 break;
             }
         }
-        if (!primaryBackend) {
-            qDebug() << "SessionManager: No LocalBackend found for collection" << col->id();
-            continue;
-        }
+        if (!primaryBackend) continue;
 
         QList<QSharedPointer<CalendarItem>> modifiedItems;
         for (const DeltaChange &delta : m_deltaChanges[calId]) {
             if (delta.change() == DeltaChange::Add) {
                 cal->addItem(delta.getItem());
                 modifiedItems.append(delta.getItem());
-                qDebug() << "SessionManager: Added item" << delta.getItem()->id() << "to calendar" << calId;
             } else if (delta.change() == DeltaChange::Modify) {
                 cal->updateItem(delta.getItem());
                 modifiedItems.append(delta.getItem());
-                qDebug() << "SessionManager: Modified item" << delta.getItem()->id() << "in calendar" << calId;
             } else if (delta.change() == DeltaChange::Remove) {
                 cal->removeItem(delta.getItem());
-                qDebug() << "SessionManager: Removed item" << delta.getItem()->id() << "from calendar" << calId;
             }
             delta.getItem()->setDirty(false);
+            commit.changes.append(delta);
         }
 
-        // Persist to backend
         if (!modifiedItems.isEmpty()) {
             primaryBackend->storeItems(cal, modifiedItems);
             qDebug() << "SessionManager: Stored" << modifiedItems.size() << "items to LocalBackend for" << calId;
         }
     }
 
+    if (!commit.changes.isEmpty()) {
+        m_history.append(commit);
+        QString collectionId = m_deltaChanges.keys().first().split("_").first();
+        saveHistory(collectionId);
+    }
+
     QString collectionId = m_deltaChanges.keys().isEmpty() ? "" : m_deltaChanges.keys().first().split("_").first();
     m_deltaChanges.clear();
     if (!collectionId.isEmpty()) {
         QFile::remove(deltaFilePath(collectionId));
-        qDebug() << "SessionManager: Cleared delta file for" << collectionId;
+        saveToFile(collectionId); // Update deltas (empty now)
+    }
+}
+
+void SessionManager::saveHistory(const QString &collectionId)
+{
+    QFile file(historyFilePath(collectionId));
+    if (file.open(QIODevice::WriteOnly)) {
+        QDataStream out(&file);
+        out << m_history;
+        file.close();
+        qDebug() << "SessionManager: Saved history to" << file.fileName();
     }
 }
 
@@ -172,6 +174,19 @@ QString SessionManager::deltaFilePath(const QString &collectionId) const
     return QDir::tempPath() + "/deltas." + collectionId + ".tmp";
 }
 
+
+QDataStream &operator<<(QDataStream &out, const SessionManager::Commit &commit)
+{
+    out << commit.timestamp << commit.changes;
+    return out;
+}
+
+QDataStream &operator>>(QDataStream &in, SessionManager::Commit &commit)
+{
+    in >> commit.timestamp >> commit.changes;
+    return in;
+}
+
 QDataStream &operator<<(QDataStream &out, const DeltaChange &delta)
 {
     out << quint32(delta.change());
@@ -201,6 +216,12 @@ QDataStream &operator>>(QDataStream &in, DeltaChange &delta)
     }
     return in;
 }
+
+QString SessionManager::historyFilePath(const QString &collectionId) const
+{
+    return QString("/tmp/commits.%1.log").arg(collectionId);
+}
+
 
 bool SessionManager::ChangeResolver::resolveUnappliedEdit(Cal* cal, const QSharedPointer<CalendarItem>& item, const QString& newSummary)
 {

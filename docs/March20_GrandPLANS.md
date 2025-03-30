@@ -93,3 +93,9 @@ once all these goals are met, we can have so many interesting ways to play with 
 An entirely higher-level logic of program application can be built, which has semantic meaning for different calendars and categories. One calendar is just sleep schedule, perhaps. Or can feature *positively defined* "free time" blocks into which other calendars can schedule activities. Also locations—when I'm at the gym, I'm out, so I can buy groceries then. Etc. Etc. All a completely higher level of logic premised on the applications foundation. 
 
 It is in this higher level that styles will cascade from global settings, to collection, to calendars, to items, depending on categories or other property filters. 
+
+## thoughts on going to far
+mar 30
+
+So I'm implementing this grand roadmap, rushing through a lot of stages and milestones. finished rebasing view classes on ViewInterface, and got multiselect and multi-commit done in like 10 minutes. Now working on this insane undo stack, which is "git inspired" and thus completely overpowered. I can undo commits? That literally breaks the semantic definition of commitment. But it's technically feasible, so let's do it anyway, I guess. My app, as a power-tool, will go too far in every direction. Into pointless-thoroughness of implementation in all the dynamic bits--because if all the parts work together when everything is doing the maximal, most extensively over-the-top thing, then it works when it's doing the more humble sane thing 99% of the time. We can always disable pointless features that work easier than we can implement new features later and then find and fix something that was broken all along, but never tested out before.
+
