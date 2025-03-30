@@ -16,6 +16,7 @@ public:
     explicit SessionManager(CollectionController *controller, QObject *parent = nullptr);
     void queueDeltaChange(const QString &calId, const QSharedPointer<CalendarItem> &item, const QString &userIntent);
     void applyDeltaChanges();
+    void clearDeltaChanges(const QString &collectionId);
     void loadStagedChanges(const QString &collectionId);
     void undoLastCommit();
     void redoLastUndo();

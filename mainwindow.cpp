@@ -26,11 +26,22 @@ MainWindow::MainWindow(QWidget *parent)
     connect(editPane, &EditPane::itemModified, sessionManager,
             [this](const QList<QSharedPointer<CalendarItem>>& items) {
                 for (const auto& item : items) {
-                sessionManager->queueDeltaChange(activeCal, item, "modify");                    ui->logTextEdit->append("Staged change for " + item->id());
+                    sessionManager->queueDeltaChange(activeCal, item, "modify");
+                    ui->logTextEdit->append("Staged change for " + item->id());
                 }
             });
 
-    // Status bar setup (adding as per previous discussion)
+    // Connect changesStaged to refresh views
+    connect(sessionManager, &SessionManager::changesStaged, this, [this]() {
+        for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
+            if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
+                view->refresh();
+                qDebug() << "MainWindow: Refreshed view for" << view->activeCal()->id();
+            }
+        }
+    });
+
+    // Status bar setup
     QLabel *statusLabel = new QLabel("Ready", this);
     QProgressBar *totalProgressBar = new QProgressBar(this);
     QProgressBar *currentProgressBar = new QProgressBar(this);
@@ -44,14 +55,14 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionSyncCollections, &QAction::triggered, this, &MainWindow::syncCollections);
     connect(ui->actionSaveCollection, &QAction::triggered, this, &MainWindow::onSaveCollection);
     connect(collectionController, &CollectionController::collectionAdded, this, &MainWindow::onCollectionAdded);
-    connect(collectionController, &CollectionController::calendarAdded, this, &MainWindow::onCalendarAdded); // Use this instead
+    connect(collectionController, &CollectionController::calendarAdded, this, &MainWindow::onCalendarAdded);
     connect(collectionController, &CollectionController::calendarsLoaded, this, &MainWindow::onCalendarsLoaded);
     connect(collectionController, &CollectionController::itemsLoaded, this, &MainWindow::onItemsLoaded);
     connect(collectionController, &CollectionController::allSyncsCompleted, this, &MainWindow::onAllSyncsCompleted);
     connect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated);
     connect(ui->actionOpenCollection, &QAction::triggered, this, &MainWindow::onOpenCollection);
     connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
-    connect(ui->actionCommitChanges, &QAction::triggered, this, &MainWindow::onCommitChanges); // New connection
+    connect(ui->actionCommitChanges, &QAction::triggered, this, &MainWindow::onCommitChanges);
 
     qDebug() << "MainWindow: Initialized";
 }
@@ -221,7 +232,6 @@ void MainWindow::onSelectionChanged()
     }
 }
 
-
 void MainWindow::onAllSyncsCompleted(const QString &collectionId)
 {
     qDebug() << "MainWindow: All syncs completed for" << collectionId;
@@ -230,7 +240,7 @@ void MainWindow::onAllSyncsCompleted(const QString &collectionId)
         qDebug() << "MainWindow: No collection found for" << collectionId;
         return;
     }
-    sessionManager->loadStagedChanges(collectionId); // Loads and applies deltas
+    sessionManager->loadStagedChanges(collectionId); // Apply deltas after ICS load
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
             view->refresh();
@@ -266,7 +276,7 @@ void MainWindow::onCollectionAdded(Collection *collection)
 {
     qDebug() << "MainWindow: onCollectionAdded for" << collection->id();
     activeCollection = collection;
-    editPane->setCollection(collection); // Just update collection
+    editPane->setCollection(collection);
     ui->logTextEdit->append("Collection opened: " + collection->name());
 }
 
@@ -346,10 +356,13 @@ void MainWindow::onCommitChanges()
         return;
     }
 
-    sessionManager->applyDeltaChanges();
+    sessionManager->applyDeltaChanges(); // Redundant but safe—ensure latest state
+    // TODO: Add LocalBackend commit logic here (future step)
     ui->logTextEdit->append("Committed staged changes to backends");
     qDebug() << "MainWindow: Committed changes for collection" << activeCollection->id();
 
+    // Clear deltas and file after commit
+    sessionManager->clearDeltaChanges(activeCollection->id());
     for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
         if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
             view->refresh();

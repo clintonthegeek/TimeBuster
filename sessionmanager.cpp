@@ -30,13 +30,12 @@ void SessionManager::queueDeltaChange(const QString &calId, const QSharedPointer
     entry.crashFlag = false;
     entry.userIntent = userIntent;
     entry.itemId = item->id();
-    entry.calId = calId; // Store the calId explicitly
+    entry.calId = calId;
     entry.icalData = item->toICal().toUtf8().toBase64();
 
     m_newDeltaChanges.append(entry);
     QString collectionId = calId.split("_").first();
-    saveToFile(collectionId);
-    saveDeltaEntries(collectionId);
+    saveDeltaEntries(collectionId); // Save only the delta entries, no cleanExit flag
     emit changesStaged(m_newDeltaChanges);
 }
 
@@ -45,7 +44,7 @@ void SessionManager::applyDeltaChanges()
     qDebug() << "SessionManager: Applying delta changes";
 
     for (const DeltaEntry &entry : m_newDeltaChanges) {
-        QString calId = entry.calId; // Use the stored calId
+        QString calId = entry.calId;
         Cal *cal = m_collectionController->getCal(calId);
         if (!cal) {
             qDebug() << "SessionManager: No calendar found for" << calId << "—skipping change";
@@ -59,13 +58,13 @@ void SessionManager::applyDeltaChanges()
                 QString icalString = QString::fromUtf8(QByteArray::fromBase64(entry.icalData.toLatin1()));
                 if (format.fromString(tempCal, icalString)) {
                     KCalendarCore::Incidence::Ptr newIncidence = tempCal->incidences().first();
-                    item->setIncidence(newIncidence); // Update the item's incidence in memory
-                    item->setDirty(true); // Mark as dirty (not committed yet)
+                    item->setIncidence(newIncidence);
+                    item->setDirty(true);
                     qDebug() << "SessionManager: Applied" << entry.userIntent << "change to item" << item->id() << "in" << calId;
                     if (entry.userIntent == "remove") {
-                        cal->removeItem(item); // Remove from in-memory Cal if needed
+                        cal->removeItem(item);
                     } else if (entry.userIntent == "add" || entry.userIntent == "modify") {
-                        cal->updateItem(item); // Ensure item is updated in Cal’s list
+                        cal->updateItem(item);
                     }
                 } else {
                     qDebug() << "SessionManager: Failed to parse iCal data for" << entry.itemId;
@@ -74,14 +73,7 @@ void SessionManager::applyDeltaChanges()
             }
         }
     }
-
-    // Clear the staged changes after applying (crash recovery complete)
-    QString collectionId = m_newDeltaChanges.isEmpty() ? "" : m_newDeltaChanges.first().calId.split("_").first();
-    if (!collectionId.isEmpty()) {
-        m_newDeltaChanges.clear();
-        QFile::remove(deltaFilePath(collectionId) + ".json");
-        saveToFile(collectionId, true); // Mark clean exit
-    }
+    // Remove the cleanup block—no clearing m_newDeltaChanges or overwriting the file here
 }
 
 void SessionManager::loadStagedChanges(const QString &collectionId)
@@ -92,25 +84,9 @@ void SessionManager::loadStagedChanges(const QString &collectionId)
         return;
     }
 
-    QFile jsonFile(deltaFilePath(collectionId) + ".json");
-    bool cleanExit = false;
-    if (jsonFile.open(QIODevice::ReadOnly)) {
-        QJsonDocument doc = QJsonDocument::fromJson(jsonFile.readAll());
-        cleanExit = doc.object()["cleanExit"].toBool(false);
-        jsonFile.close();
-    }
-
-    if (!cleanExit) {
-        qDebug() << "SessionManager: Crash detected for" << collectionId << "—uncommitted changes loaded";
-        applyDeltaChanges(); // Auto-apply changes without prompt
-    } else {
-        qDebug() << "SessionManager: Clean exit detected, clearing staged changes for" << collectionId;
-        m_newDeltaChanges.clear();
-        QFile::remove(deltaFilePath(collectionId) + ".json");
-        saveToFile(collectionId, true);
-    }
-
-    emit changesStaged(m_newDeltaChanges);
+    qDebug() << "SessionManager: Loaded" << m_newDeltaChanges.size() << "staged changes for" << collectionId;
+    applyDeltaChanges(); // Always apply deltas
+    emit changesStaged(m_newDeltaChanges); // Notify views
 }
 
 void SessionManager::undoLastCommit()
@@ -123,7 +99,7 @@ void SessionManager::redoLastUndo()
     qDebug() << "SessionManager: redoLastUndo (stub)";
 }
 
-void SessionManager::saveToFile(const QString &collectionId, bool cleanExit)
+/*void SessionManager::saveToFile(const QString &collectionId, bool cleanExit)
 {
     QFile jsonFile(deltaFilePath(collectionId) + ".json");
     if (!jsonFile.open(QIODevice::WriteOnly)) {
@@ -143,7 +119,7 @@ void SessionManager::saveToFile(const QString &collectionId, bool cleanExit)
     jsonFile.write(doc.toJson(QJsonDocument::Compact));
     jsonFile.close();
     qDebug() << "SessionManager: Saved" << m_newDeltaChanges.size() << "JSON entries to" << jsonFile.fileName();
-}
+}*/
 
 void SessionManager::saveHistory(const QString &collectionId)
 {
@@ -211,6 +187,13 @@ QList<DeltaEntry> SessionManager::loadDeltaEntries(const QString &collectionId)
     file.close();
     qDebug() << "SessionManager: Loaded" << entries.size() << "JSON entries from" << file.fileName();
     return entries;
+}
+
+void SessionManager::clearDeltaChanges(const QString &collectionId)
+{
+    m_newDeltaChanges.clear();
+    QFile::remove(deltaFilePath(collectionId) + ".json");
+    qDebug() << "SessionManager: Cleared delta changes for" << collectionId;
 }
 
 bool SessionManager::ChangeResolver::resolveUnappliedEdit(Cal* cal, const QSharedPointer<CalendarItem>& item, const QString& newSummary)
