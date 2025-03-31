@@ -11,6 +11,7 @@ qt_standard_project_setup()
 find_package(KF6CalendarCore REQUIRED)
 find_package(KF6DAV REQUIRED)
 find_package(KF6CoreAddons REQUIRED)
+find_package(KF6WidgetsAddons REQUIRED)
 
 add_library(TimeBusterCore SHARED
     mainwindow.cpp
@@ -45,7 +46,8 @@ target_link_libraries(TimeBusterCore
     Qt::Sql
     KF6::CalendarCore
     KF6::DAV
-    KF6::CoreAddons)
+    KF6::CoreAddons
+    KF6::WidgetsAddons)
 
 qt_add_executable(TimeBuster
     WIN32 MACOSX_BUNDLE
@@ -61,6 +63,7 @@ target_link_libraries(TimeBuster
     KF6::CalendarCore
     KF6::DAV
     KF6::CoreAddons
+    KF6::WidgetsAddons
     TimeBusterCore
 )
 

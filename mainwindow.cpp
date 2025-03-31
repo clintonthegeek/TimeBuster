@@ -19,8 +19,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // Dock EditPane
-    ui->editDock->setWidget(editPane);
+    // Dock EditPane using widget()
+    ui->editDock->setWidget(editPane->widget());
 
     // Connect EditPane’s itemModified to SessionManager
     connect(editPane, &EditPane::itemModified, sessionManager,
@@ -64,9 +64,20 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
     connect(ui->actionCommitChanges, &QAction::triggered, this, &MainWindow::onCommitChanges);
 
+    // Connect CalendarTableView selections dynamically
+    connect(collectionController, &CollectionController::calendarAdded, this, [this](Cal *cal) {
+        for (QMdiSubWindow *window : ui->mdiArea->subWindowList()) {
+            if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
+                if (view->activeCal() == cal) {
+                    connect(view, &CalendarTableView::itemSelected, editPane, &EditPane::updateSelection);
+                    qDebug() << "MainWindow: Connected itemSelected for" << cal->id();
+                }
+            }
+        }
+    });
+
     qDebug() << "MainWindow: Initialized";
 }
-
 MainWindow::~MainWindow()
 {
     qDebug() << "MainWindow: Destroying MainWindow";
