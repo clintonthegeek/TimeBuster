@@ -73,7 +73,6 @@ void SessionManager::applyDeltaChanges()
             }
         }
     }
-    // Remove the cleanup block—no clearing m_newDeltaChanges or overwriting the file here
 }
 
 void SessionManager::loadStagedChanges(const QString &collectionId)
@@ -85,8 +84,8 @@ void SessionManager::loadStagedChanges(const QString &collectionId)
     }
 
     qDebug() << "SessionManager: Loaded" << m_newDeltaChanges.size() << "staged changes for" << collectionId;
-    applyDeltaChanges(); // Always apply deltas
-    emit changesStaged(m_newDeltaChanges); // Notify views
+    applyDeltaChanges();
+    emit changesStaged(m_newDeltaChanges);
 }
 
 void SessionManager::undoLastCommit()
@@ -98,28 +97,6 @@ void SessionManager::redoLastUndo()
 {
     qDebug() << "SessionManager: redoLastUndo (stub)";
 }
-
-/*void SessionManager::saveToFile(const QString &collectionId, bool cleanExit)
-{
-    QFile jsonFile(deltaFilePath(collectionId) + ".json");
-    if (!jsonFile.open(QIODevice::WriteOnly)) {
-        qDebug() << "SessionManager: Failed to save JSON to" << jsonFile.fileName();
-        return;
-    }
-
-    QJsonObject root;
-    QJsonArray array;
-    for (const DeltaEntry &entry : m_newDeltaChanges) {
-        array.append(entry.toJson());
-    }
-    root["changes"] = array;
-    root["cleanExit"] = cleanExit;
-
-    QJsonDocument doc(root);
-    jsonFile.write(doc.toJson(QJsonDocument::Compact));
-    jsonFile.close();
-    qDebug() << "SessionManager: Saved" << m_newDeltaChanges.size() << "JSON entries to" << jsonFile.fileName();
-}*/
 
 void SessionManager::saveHistory(const QString &collectionId)
 {
@@ -136,23 +113,27 @@ QString SessionManager::deltaFilePath(const QString &collectionId) const
 {
     QString kalbPath = m_collectionController->kalbPath(collectionId);
     if (kalbPath.isEmpty()) {
-        return QDir::tempPath() + "/deltas." + collectionId + ".tmp"; // Transient fallback
+        // For transient collections, use the temp directory as a fallback
+        return QDir::tempPath() + "/deltas." + collectionId + ".json";
     }
-    return QFileInfo(kalbPath).absolutePath() + "/deltas." + collectionId;
+    // Use the directory containing the .kalb file
+    return QFileInfo(kalbPath).absolutePath() + "/deltas." + collectionId + ".json";
 }
 
 QString SessionManager::historyFilePath(const QString &collectionId) const
 {
     QString kalbPath = m_collectionController->kalbPath(collectionId);
     if (kalbPath.isEmpty()) {
-        return QString("/tmp/commits.%1.log").arg(collectionId); // Transient fallback
+        // For transient collections, use the temp directory as a fallback
+        return QDir::tempPath() + "/history." + collectionId + ".log";
     }
+    // Use the directory containing the .kalb file
     return QFileInfo(kalbPath).absolutePath() + "/history." + collectionId + ".log";
 }
 
 void SessionManager::saveDeltaEntries(const QString &collectionId)
 {
-    QFile file(deltaFilePath(collectionId) + ".json");
+    QFile file(deltaFilePath(collectionId));
     if (!file.open(QIODevice::WriteOnly)) {
         qDebug() << "SessionManager: Failed to save JSON to" << file.fileName();
         return;
@@ -174,7 +155,7 @@ void SessionManager::saveDeltaEntries(const QString &collectionId)
 QList<DeltaEntry> SessionManager::loadDeltaEntries(const QString &collectionId)
 {
     QList<DeltaEntry> entries;
-    QFile file(deltaFilePath(collectionId) + ".json");
+    QFile file(deltaFilePath(collectionId));
     if (!file.open(QIODevice::ReadOnly)) {
         return entries;
     }
@@ -191,8 +172,17 @@ QList<DeltaEntry> SessionManager::loadDeltaEntries(const QString &collectionId)
 
 void SessionManager::clearDeltaChanges(const QString &collectionId)
 {
+    if (!m_newDeltaChanges.isEmpty()) {
+        // Package the current delta changes into a Commit before clearing
+        Commit commit;
+        commit.timestamp = QDateTime::currentDateTimeUtc();
+        commit.changes = m_newDeltaChanges;
+        m_history.append(commit);
+        saveHistory(collectionId); // Persist the history file
+    }
+
     m_newDeltaChanges.clear();
-    QFile::remove(deltaFilePath(collectionId) + ".json");
+    QFile::remove(deltaFilePath(collectionId));
     qDebug() << "SessionManager: Cleared delta changes for" << collectionId;
 }
 
@@ -200,11 +190,10 @@ bool SessionManager::ChangeResolver::resolveUnappliedEdit(Cal* cal, const QShare
 {
     if (!cal || !item) return false;
 
-    // Clone the incidence and wrap it in a QSharedPointer
     KCalendarCore::Incidence::Ptr incidence = KCalendarCore::Incidence::Ptr(item->incidence()->clone());
     incidence->setSummary(newSummary);
-    item->setIncidence(incidence); // Update the item's incidence
-    item->setDirty(true); // Mark as dirty for persistence
+    item->setIncidence(incidence);
+    item->setDirty(true);
 
     m_session->queueDeltaChange(cal->id(), item, "modify");
     return true;
