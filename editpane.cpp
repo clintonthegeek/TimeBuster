@@ -1,7 +1,7 @@
 #include "editpane.h"
 #include <QVBoxLayout>
 #include <QDebug>
-#include <QLabel> // Added for casting
+#include <QLabel>
 
 EditPane::EditPane(Collection* collection, QWidget* parent)
     : ViewInterface(collection, parent),
@@ -15,27 +15,23 @@ EditPane::EditPane(Collection* collection, QWidget* parent)
     m_applyButton(new QPushButton("Apply", this)),
     m_items()
 {
-    // Setup widgets
     m_dtStartEdit->setDisplayFormat("yyyy-MM-dd HH:mm");
     m_dtEndDueEdit->setDisplayFormat("yyyy-MM-dd HH:mm");
     m_categoriesCombo->setEditable(true);
     m_categoriesCombo->addItems({"Work", "Personal", "Urgent", ""});
     m_descriptionEdit->setMaximumHeight(100);
 
-    // Add to layout
     m_layout->addRow("Summary:", m_summaryEdit);
     m_layout->addRow("Start:", m_dtStartEdit);
-    m_layout->addRow("End/Due:", m_dtEndDueEdit); // Label will be adjusted dynamically
+    m_layout->addRow("End/Due:", m_dtEndDueEdit);
     m_layout->addRow("Categories:", m_categoriesCombo);
     m_layout->addRow("Description:", m_descriptionEdit);
     m_layout->addRow("", m_allDayCheck);
     m_layout->addRow("", m_applyButton);
 
-    // Connections
     connect(m_applyButton, &QPushButton::clicked, this, &EditPane::onApplyClicked);
     connect(m_allDayCheck, &QCheckBox::toggled, this, &EditPane::onAllDayToggled);
 
-    // Initial state
     setLayout(m_layout);
     onAllDayToggled(false);
     setEnabled(false);
@@ -98,21 +94,113 @@ void EditPane::updateSelection(const QList<QSharedPointer<CalendarItem>>& items)
         if (item->type() != "Todo") allTodos = false;
     }
 
-    // Adjust label based on type
     QLabel* endDueLabel = qobject_cast<QLabel*>(m_layout->labelForField(m_dtEndDueEdit));
     if (endDueLabel) {
         endDueLabel->setText(allTodos ? "Due:" : "End:");
-    } else {
-        qDebug() << "EditPane: Failed to cast end/due label to QLabel";
     }
 
-    // TODO: Fill fields with item data (Milestone 3)
+    // Single item: load directly; multiple: check for divergence
+    if (m_items.size() == 1) {
+        const auto& item = m_items[0];
+        m_summaryEdit->setText(item->incidence()->summary());
+        m_dtStartEdit->setDateTime(item->dtStart().isValid() ? item->dtStart() : QDateTime::currentDateTime());
+        m_dtEndDueEdit->setDateTime(item->dtEndOrDue().isValid() ? item->dtEndOrDue() : QDateTime::currentDateTime().addSecs(3600));
+        m_categoriesCombo->setCurrentText(item->categories().join(", "));
+        m_descriptionEdit->setText(item->description());
+        m_allDayCheck->setChecked(item->allDay());
+    } else {
+        // Summary
+        m_summaryEdit->setText(summariesDiffer() ? "<Multiple Values>" : m_items[0]->incidence()->summary());
+
+        // dtStart
+        QDateTime firstDtStart = m_items[0]->dtStart();
+        bool dtStartDiffer = false;
+        for (int i = 1; i < m_items.size(); ++i) {
+            if (m_items[i]->dtStart() != firstDtStart) {
+                dtStartDiffer = true;
+                break;
+            }
+        }
+        m_dtStartEdit->setDateTime(dtStartDiffer ? QDateTime::currentDateTime() : firstDtStart);
+
+        // dtEndOrDue
+        QDateTime firstDtEndDue = m_items[0]->dtEndOrDue();
+        bool dtEndDueDiffer = false;
+        for (int i = 1; i < m_items.size(); ++i) {
+            if (m_items[i]->dtEndOrDue() != firstDtEndDue) {
+                dtEndDueDiffer = true;
+                break;
+            }
+        }
+        m_dtEndDueEdit->setDateTime(dtEndDueDiffer ? QDateTime::currentDateTime().addSecs(3600) : firstDtEndDue);
+
+        // Categories
+        QStringList firstCats = m_items[0]->categories();
+        bool catsDiffer = false;
+        for (int i = 1; i < m_items.size(); ++i) {
+            if (m_items[i]->categories() != firstCats) {
+                catsDiffer = true;
+                break;
+            }
+        }
+        m_categoriesCombo->setCurrentText(catsDiffer ? "<Multiple Values>" : firstCats.join(", "));
+
+        // Description
+        QString firstDesc = m_items[0]->description();
+        bool descDiffer = false;
+        for (int i = 1; i < m_items.size(); ++i) {
+            if (m_items[i]->description() != firstDesc) {
+                descDiffer = true;
+                break;
+            }
+        }
+        m_descriptionEdit->setText(descDiffer ? "<Multiple Values>" : firstDesc);
+
+        // All Day
+        bool firstAllDay = m_items[0]->allDay();
+        bool allDayDiffer = false;
+        for (int i = 1; i < m_items.size(); ++i) {
+            if (m_items[i]->allDay() != firstAllDay) {
+                allDayDiffer = true;
+                break;
+            }
+        }
+        m_allDayCheck->setChecked(firstAllDay && !allDayDiffer);
+    }
+
+    onAllDayToggled(m_allDayCheck->isChecked()); // Adjust display format
     qDebug() << "EditPane: Updated selection with" << items.size() << "items";
 }
 
 void EditPane::onApplyClicked()
 {
-    qDebug() << "EditPane: Apply clicked—stub";
+    if (m_items.isEmpty()) return;
+
+    bool allEvents = true, allTodos = true;
+    for (const auto& item : m_items) {
+        if (item->type() != "Event") allEvents = false;
+        if (item->type() != "Todo") allTodos = false;
+    }
+
+    for (auto& item : m_items) {
+        // Only update fields that aren't "<Multiple Values>"
+        if (m_summaryEdit->text() != "<Multiple Values>")
+            item->incidence()->setSummary(m_summaryEdit->text());
+        if (m_dtStartEdit->dateTime().isValid())
+            item->setDtStart(m_dtStartEdit->dateTime());
+        if (m_dtEndDueEdit->dateTime().isValid())
+            item->setDtEndOrDue(m_dtEndDueEdit->dateTime());
+        if (m_categoriesCombo->currentText() != "<Multiple Values>") {
+            QStringList cats = m_categoriesCombo->currentText().split(", ", Qt::SkipEmptyParts);
+            item->setCategories(cats);
+        }
+        if (m_descriptionEdit->toPlainText() != "<Multiple Values>")
+            item->setDescription(m_descriptionEdit->toPlainText());
+        item->setAllDay(m_allDayCheck->isChecked());
+    }
+
+    emit itemModified(m_items);
+    qDebug() << "EditPane: Applied batch edit to" << m_items.size() << "items in" << (m_activeCal ? m_activeCal->id() : "null");
 }
 
 void EditPane::onAllDayToggled(bool checked)
