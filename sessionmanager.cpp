@@ -12,11 +12,13 @@
 #include <QUuid>
 #include <QJsonDocument>
 #include <QJsonArray>
+#include <QCoreApplication>
 
 SessionManager::SessionManager(CollectionController *controller, QObject *parent)
-    : QObject(parent), m_collectionController(controller), m_sessionId(QUuid::createUuid().toString())
+    : QObject(parent), m_collectionController(controller), m_sessionId(QUuid::createUuid().toString()), m_cleanExit(false)
 {
     qDebug() << "SessionManager: Initialized with sessionId" << m_sessionId;
+    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &SessionManager::onAboutToQuit);
 }
 
 void SessionManager::queueDeltaChange(const QString &calId, const QSharedPointer<CalendarItem> &item, const QString &userIntent)
@@ -79,10 +81,9 @@ void SessionManager::loadStagedChanges(const QString &collectionId)
 {
     m_newDeltaChanges = loadDeltaEntries(collectionId);
     if (m_newDeltaChanges.isEmpty()) {
-        qDebug() << "SessionManager: No staged changes found at" << deltaFilePath(collectionId) + ".json";
+        qDebug() << "SessionManager: No staged changes found at" << deltaFilePath(collectionId); // Remove extra ".json"
         return;
     }
-
     qDebug() << "SessionManager: Loaded" << m_newDeltaChanges.size() << "staged changes for" << collectionId;
     applyDeltaChanges();
     emit changesStaged(m_newDeltaChanges);
@@ -145,11 +146,12 @@ void SessionManager::saveDeltaEntries(const QString &collectionId)
         array.append(entry.toJson());
     }
     root["changes"] = array;
+    root["cleanExit"] = m_cleanExit; // Add semantic flag
 
     QJsonDocument doc(root);
     file.write(doc.toJson(QJsonDocument::Compact));
     file.close();
-    qDebug() << "SessionManager: Saved" << m_newDeltaChanges.size() << "JSON entries to" << file.fileName();
+    qDebug() << "SessionManager: Saved" << m_newDeltaChanges.size() << "JSON entries to" << file.fileName() << "with cleanExit:" << m_cleanExit;
 }
 
 QList<DeltaEntry> SessionManager::loadDeltaEntries(const QString &collectionId)
@@ -157,17 +159,39 @@ QList<DeltaEntry> SessionManager::loadDeltaEntries(const QString &collectionId)
     QList<DeltaEntry> entries;
     QFile file(deltaFilePath(collectionId));
     if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "SessionManager: No delta file found at" << file.fileName();
         return entries;
     }
 
     QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    QJsonArray array = doc.object()["changes"].toArray();
+    if (doc.isNull() || !doc.isObject()) {
+        qDebug() << "SessionManager: Delta file" << file.fileName() << "is corrupt—ignoring";
+        file.close();
+        return entries;
+    }
+
+    QJsonObject root = doc.object();
+    bool cleanExit = root["cleanExit"].toBool(false);
+    qDebug() << "SessionManager: Loaded delta file with cleanExit:" << cleanExit;
+
+    QJsonArray array = root["changes"].toArray();
     for (const QJsonValue &value : array) {
         entries.append(DeltaEntry::fromJson(value.toObject()));
     }
     file.close();
     qDebug() << "SessionManager: Loaded" << entries.size() << "JSON entries from" << file.fileName();
     return entries;
+}
+
+void SessionManager::onAboutToQuit()
+{
+    m_cleanExit = true;
+    for (const QString &collectionId : m_collectionController->collections().keys()) {
+        if (!m_newDeltaChanges.isEmpty()) {
+            saveDeltaEntries(collectionId); // Update cleanExit in deltas file
+        }
+    }
+    qDebug() << "SessionManager: Application quitting cleanly";
 }
 
 void SessionManager::clearDeltaChanges(const QString &collectionId)

@@ -55,6 +55,10 @@ private:
     QList<Commit> m_undoStack;
     ChangeResolver m_resolver{this};
     QString m_sessionId;
+    bool m_cleanExit; // Add this
+
+private slots:
+    void onAboutToQuit();
 };
 
 QDataStream &operator<<(QDataStream &out, const SessionManager::Commit &commit);
