@@ -10,6 +10,7 @@
 #include <QMenu>
 #include <QProgressBar>
 #include <QMessageBox>
+#include <QLabel>
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -21,6 +22,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Dock EditPane using widget()
     ui->editDock->setWidget(editPane->widget());
+
+    tabifyDockWidget(ui->stageDock, ui->propertiesDock); // Use 'this' implicitly
 
     // Connect EditPane’s itemModified to SessionManager
     connect(editPane, &EditPane::itemModified, sessionManager,
@@ -46,8 +49,25 @@ MainWindow::MainWindow(QWidget *parent)
     QProgressBar *totalProgressBar = new QProgressBar(this);
     QProgressBar *currentProgressBar = new QProgressBar(this);
     ui->statusBar->addWidget(statusLabel, 1);
-    ui->statusBar->addPermanentWidget(totalProgressBar);
-    ui->statusBar->addPermanentWidget(currentProgressBar);
+
+    QWidget *totalProgressWidget = new QWidget(this);
+    QHBoxLayout *totalProgressLayout = new QHBoxLayout(totalProgressWidget);
+    QLabel *totalProgressLabel = new QLabel("Total Progress:", this);
+    totalProgressBar->setMinimumWidth(100);
+    totalProgressLayout->addWidget(totalProgressLabel);
+    totalProgressLayout->addWidget(totalProgressBar);
+    totalProgressLayout->setContentsMargins(0, 0, 0, 0);
+
+    QWidget *currentProgressWidget = new QWidget(this);
+    QHBoxLayout *currentProgressLayout = new QHBoxLayout(currentProgressWidget);
+    QLabel *currentProgressLabel = new QLabel("Current Task:", this);
+    currentProgressBar->setMinimumWidth(100);
+    currentProgressLayout->addWidget(currentProgressLabel);
+    currentProgressLayout->addWidget(currentProgressBar);
+    currentProgressLayout->setContentsMargins(0, 0, 0, 0);
+
+    ui->statusBar->addPermanentWidget(totalProgressWidget);
+    ui->statusBar->addPermanentWidget(currentProgressWidget);
 
     // Connect menu actions
     connect(ui->actionNewLocalCollection, &QAction::triggered, this, &MainWindow::addLocalCollection);

@@ -17,46 +17,42 @@
    <layout class="QVBoxLayout" name="centralLayout">
     <item>
      <widget class="QSplitter" name="mainSplitter">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <widget class="QWidget" name="propertiesPane">
-       <layout class="QVBoxLayout" name="propertiesLayout">
-        <item>
-         <widget class="QTreeView" name="collectionTree">
-          <property name="headerHidden">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <layout class="QFormLayout" name="propertiesForm">
-          <item row="0" column="0">
-           <widget class="QLabel" name="labelPath">
-            <property name="text">
-             <string>Path:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QLabel" name="valuePath">
-            <property name="text">
-             <string>(none)</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QMdiArea" name="mdiArea">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-         <horstretch>1</horstretch>
-         <verstretch>1</verstretch>
-        </sizepolicy>
-       </property>
-      </widget>
+ <property name="orientation">
+  <enum>Qt::Horizontal</enum>
+ </property>
+ <widget class="QMdiArea" name="mdiArea">
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+    <horstretch>1</horstretch>
+    <verstretch>1</verstretch>
+   </sizepolicy>
+  </property>
+ </widget>
+</widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusBar">
+   <property name="sizeGripEnabled">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <!-- Already existing logDock -->
+<widget class="QDockWidget" name="logDock">
+ <property name="windowTitle">
+  <string>Log</string>
+ </property>
+ <attribute name="dockWidgetArea">
+  <number>8</number>
+ </attribute>
+ <widget class="QTextEdit" name="logTextEdit">
+  <property name="readOnly">
+  <bool>true</bool>
+ </property>
+</widget>
+</widget>
+
+<!-- Moved editDock -->
 <widget class="QDockWidget" name="editDock">
  <property name="features">
   <set>QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetMovable|QDockWidget::DockWidgetFloatable</set>
@@ -70,26 +66,63 @@
  <attribute name="dockWidgetArea">
   <number>2</number> <!-- Right dock -->
  </attribute>
- <widget class="QWidget" name="editPanePlaceholder" /> <!-- Placeholder, replaced by EditPane -->
+ <widget class="QWidget" name="editPanePlaceholder" />
 </widget>
-     </widget>
-    </item>
-   </layout>
-  </widget>
-  <widget class="QStatusBar" name="statusBar">
-   <property name="sizeGripEnabled">
-    <bool>true</bool>
-   </property>
-  </widget>
-  <widget class="QDockWidget" name="logDock">
-   <property name="windowTitle">
-    <string>Log</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>8</number>
-   </attribute>
-   <widget class="QTextEdit" name="logTextEdit"/>
-  </widget>
+
+<!-- Moved stageDock -->
+<widget class="QDockWidget" name="stageDock">
+ <property name="features">
+  <set>QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetMovable|QDockWidget::DockWidgetFloatable</set>
+ </property>
+ <property name="allowedAreas">
+  <set>Qt::LeftDockWidgetArea|Qt::RightDockWidgetArea</set>
+ </property>
+ <property name="windowTitle">
+  <string>Stage</string>
+ </property>
+ <attribute name="dockWidgetArea">
+  <number>1</number> <!-- Left dock -->
+ </attribute>
+ <widget class="QWidget" name="stagePanePlaceholder" />
+</widget>
+<!-- Add propertiesDock as a top-level dock widget -->
+<widget class="QDockWidget" name="propertiesDock">
+ <property name="windowTitle">
+  <string>Properties</string>
+ </property>
+ <attribute name="dockWidgetArea">
+  <number>1</number> <!-- Left dock -->
+ </attribute>
+ <widget class="QWidget" name="propertiesPane">
+  <layout class="QVBoxLayout" name="propertiesLayout">
+   <item>
+    <widget class="QTreeView" name="collectionTree">
+     <property name="headerHidden">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QFormLayout" name="propertiesForm">
+     <item row="0" column="0">
+      <widget class="QLabel" name="labelPath">
+       <property name="text">
+        <string>Path:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QLabel" name="valuePath">
+       <property name="text">
+        <string>(none)</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+</widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
     <rect>
