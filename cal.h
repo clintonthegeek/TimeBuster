@@ -20,6 +20,7 @@ public:
 
     QString id() const { return m_id; }
     QString name() const { return m_name; }
+    void setName(const QString &name); // New method
     QString calId() const { return m_calId; } // Add if not present
     Collection* parentCollection() const { return m_parent; } // New getter
     void addItem(QSharedPointer<CalendarItem> item);

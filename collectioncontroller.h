@@ -24,6 +24,7 @@ public:
 
     void loadCollection(const QString &name, SyncBackend *initialBackend = nullptr, bool isTransient = false, const QString &kalbPath = QString());
     bool saveCollection(const QString &collectionId, const QString &kalbPath = QString());
+    void unloadCollection(const QString &collectionId); // New method
     void attachLocalBackend(const QString &collectionId, SyncBackend *localBackend);
 
 signals:

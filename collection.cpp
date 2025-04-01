@@ -38,6 +38,12 @@ QVariant Collection::data(const QModelIndex &index, int role) const
     }
 }
 
+void Collection::clearCalendars()
+{
+    m_calendars.clear();
+    emit calendarsChanged();
+}
+
 QVariant Collection::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (role != Qt::DisplayRole || orientation != Qt::Horizontal)

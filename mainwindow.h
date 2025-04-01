@@ -3,6 +3,9 @@
 
 #include <QMainWindow>
 #include <QMdiSubWindow>
+#include <QStandardItemModel>
+#include <QTreeView>
+#include <QCloseEvent>
 #include "collectioncontroller.h"
 #include "credentialsdialog.h"
 #include "syncbackend.h"
@@ -26,6 +29,9 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private slots:
     void addLocalCollection();
     void addRemoteCollection();
@@ -34,6 +40,7 @@ private slots:
     void syncCollections();
     void onCollectionAdded(Collection *collection);
     void onOpenCollection(); // New slot
+    void onCloseCollection(); // New slot to close the collection
     void onItemAdded(Cal *cal, QSharedPointer<CalendarItem> item);
     void onCalendarLoaded(Cal *cal);
     void onSaveCollection();
@@ -45,6 +52,8 @@ private slots:
     void onCalendarAdded(Cal *cal); // New slot
     void onAllSyncsCompleted(const QString &collectionId); // New slot
 
+    void onTreeClicked(const QModelIndex &index);
+
 private:
     void addCalendarView(Cal *cal);
     void onItemSelected(const QList<QSharedPointer<CalendarItem>>& items); // New slot
@@ -54,6 +63,8 @@ private:
     bool isCollectionTransient(const QString &collectionId) const;
 
     EditPane* editPane; // New member
+    QStandardItemModel *collectionModel; // Tree model for collectionTree
+    QMap<QString, QMdiSubWindow*> calToSubWindow; // Map calendar IDs to subwindows
     CredentialsDialog *credentialsDialog;
     Ui::MainWindow *ui;
     CollectionController *collectionController;

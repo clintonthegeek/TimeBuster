@@ -131,6 +131,27 @@ void CollectionController::loadCollection(const QString &name, SyncBackend *init
     }
 }
 
+void CollectionController::unloadCollection(const QString &collectionId)
+{
+    Collection *collection = m_collections.value(collectionId);
+    if (!collection) {
+        qDebug() << "CollectionController: No collection found for" << collectionId << "to unload";
+        return;
+    }
+
+    // Clear calendars from m_calMap and let QSharedPointer handle deletion
+    for (Cal *cal : collection->calendars()) {
+        m_calMap.remove(cal->id());
+    }
+    collection->clearCalendars(); // Clear the list, letting QSharedPointer delete the Cal objects
+
+    // Remove the collection from m_collections
+    m_collections.remove(collectionId);
+    delete collection;
+
+    qDebug() << "CollectionController: Unloaded collection" << collectionId;
+}
+
 bool CollectionController::saveCollection(const QString &collectionId, const QString &kalbPath)
 {
     if (!m_collections.contains(collectionId)) {
@@ -222,7 +243,6 @@ void CollectionController::onDataLoaded()
         }
     }
 }
-
 void CollectionController::onCalendarDiscovered(const QString &collectionId, const CalendarMetadata &calendar)
 {
     Collection *col = m_collections.value(collectionId);
@@ -230,13 +250,21 @@ void CollectionController::onCalendarDiscovered(const QString &collectionId, con
         qDebug() << "CollectionController: No collection for" << collectionId;
         return;
     }
-    if (m_calMap.contains(calendar.id)) {
-        qDebug() << "CollectionController: Skipping duplicate calendar" << calendar.id;
-        return;
+
+    Cal *cal = nullptr;
+    Cal *existingCal = m_calMap.value(calendar.id);
+    if (existingCal) {
+        qDebug() << "CollectionController: Updating existing calendar" << calendar.id;
+        existingCal->setName(calendar.name);
+        cal = existingCal;
+    } else {
+        cal = new Cal(calendar.id, calendar.name, col);
+        col->addCal(cal);
+        m_calMap[calendar.id] = cal;
+        qDebug() << "CollectionController: Added calendar" << calendar.id << "to" << collectionId;
     }
-    Cal *cal = new Cal(calendar.id, calendar.name, col);
-    col->addCal(cal);
-    m_calMap[calendar.id] = cal;
+
+    // Emit calendarAdded with the Cal* object
     emit calendarAdded(cal);
 }
 

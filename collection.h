@@ -24,6 +24,7 @@ public:
     QString name() const { return m_name; }
     void addCal(Cal *cal); // Takes ownership via QSharedPointer
     QList<Cal*> calendars() const; // Returns raw pointers for compatibility
+    void clearCalendars(); // New method to clear calendars
 
 signals:
     void calendarsChanged();

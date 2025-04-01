@@ -8,6 +8,12 @@ Cal::Cal(const QString &id, const QString &name, Collection *parent)
     qDebug() << "Cal: Created with id" << m_id << "name" << m_name;
 }
 
+void Cal::setName(const QString &name)
+{
+    m_name = name;
+    qDebug() << "Cal: Updated name to" << m_name << "for" << m_id;
+}
+
 void Cal::addItem(QSharedPointer<CalendarItem> item)
 {
     if (!item) {

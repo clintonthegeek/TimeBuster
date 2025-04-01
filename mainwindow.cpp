@@ -16,14 +16,51 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), credentialsDialog(new CredentialsDialog(this)),
     collectionController(new CollectionController(this)), sessionManager(new SessionManager(collectionController, this)),
-    activeCollection(nullptr), editPane(new EditPane(nullptr, this)), currentItem(nullptr)
+    activeCollection(nullptr), activeCal(QString()), editPane(new EditPane(nullptr, this)), currentItem(nullptr)
 {
     ui->setupUi(this);
 
+
+    // Initialize the tree model
+    collectionModel = new QStandardItemModel(this);
+    QTreeView *collectionTree = ui->propertiesDock->findChild<QTreeView*>("collectionTree");
+    if (!collectionTree) {
+        qFatal("Failed to find collectionTree in propertiesDock");
+    }
+    collectionTree->setModel(collectionModel);
+    collectionTree->setHeaderHidden(true);
+
+    // Set up context menu for the tree
+    collectionTree->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(collectionTree, &QTreeView::customContextMenuRequested, this, [this, collectionTree](const QPoint &pos) {
+        QModelIndex index = collectionTree->indexAt(pos);
+        if (!index.isValid()) return;
+
+        QStandardItem *item = collectionModel->itemFromIndex(index);
+        if (item->parent()) return; // Only show context menu for the root item (collection)
+
+        QMenu contextMenu(this);
+        QAction *closeAction = contextMenu.addAction("Close Collection");
+        connect(closeAction, &QAction::triggered, this, &MainWindow::onCloseCollection); // Updated
+
+        contextMenu.exec(collectionTree->viewport()->mapToGlobal(pos));
+    });
+
+    // Connect tree clicks to open/focus subwindows
+    connect(collectionTree, &QTreeView::clicked, this, &MainWindow::onTreeClicked);
+
     // Dock EditPane using widget()
+
     ui->editDock->setWidget(editPane->widget());
 
+    // Tabify stageDock and propertiesDock
     tabifyDockWidget(ui->stageDock, ui->propertiesDock); // Use 'this' implicitly
+
+    // Set minimum widths for docks
+    ui->editDock->setMinimumWidth(200);
+    ui->stageDock->setMinimumWidth(200);
+    ui->propertiesDock->setMinimumWidth(200);
+    ui->logDock->setMinimumHeight(100);
 
     // Connect EditPane’s itemModified to SessionManager
     connect(editPane, &EditPane::itemModified, sessionManager,
@@ -83,6 +120,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionOpenCollection, &QAction::triggered, this, &MainWindow::onOpenCollection);
     connect(ui->actionAddLocalBackend, &QAction::triggered, this, &MainWindow::onAddLocalBackend);
     connect(ui->actionCommitChanges, &QAction::triggered, this, &MainWindow::onCommitChanges);
+    connect(ui->actionCloseCollection, &QAction::triggered, this, &MainWindow::onCloseCollection); // Updated
 
     // Connect CalendarTableView selections dynamically
     connect(collectionController, &CollectionController::calendarAdded, this, [this](Cal *cal) {
@@ -106,6 +144,12 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    onCloseCollection();
+    event->accept();
+}
+
 void MainWindow::addCalendarView(Cal* cal)
 {
     CalendarTableView* view = new CalendarTableView(cal, this);
@@ -115,11 +159,14 @@ void MainWindow::addCalendarView(Cal* cal)
     subWindow->resize(400, 300);
     subWindow->show();
 
+    // Store the subwindow in the map
+    calToSubWindow[cal->id()] = subWindow;
+
     connect(view, &CalendarTableView::itemSelected, editPane, &EditPane::updateSelection);
     connect(view, &CalendarTableView::itemModified, sessionManager,
-            [this](const QList<QSharedPointer<CalendarItem>>& items) {
+            [this, cal](const QList<QSharedPointer<CalendarItem>>& items) {
                 for (const auto& item : items) {
-                    sessionManager->queueDeltaChange(activeCal, item, "modify");
+                    sessionManager->queueDeltaChange(cal->id(), item, "modify");
                 }
             });
 
@@ -153,6 +200,36 @@ void MainWindow::addRemoteCollection()
     } else {
         ui->logTextEdit->append("Remote collection creation canceled");
     }
+}
+
+void MainWindow::onTreeClicked(const QModelIndex &index)
+{
+    if (!index.isValid()) return;
+
+    // Check if the clicked item is a calendar (has a parent, i.e., under the collection root)
+    QStandardItem *item = collectionModel->itemFromIndex(index);
+    if (!item->parent()) return; // Clicked on the root (collection), not a calendar
+
+    QString calId = item->data(Qt::UserRole).toString();
+    Cal *cal = collectionController->getCal(calId);
+    if (!cal) return;
+
+    // Check if the subwindow already exists
+    QMdiSubWindow *subWindow = calToSubWindow.value(calId, nullptr);
+    if (subWindow) {
+        // Subwindow exists, bring it to the front
+        ui->mdiArea->setActiveSubWindow(subWindow);
+        subWindow->show();
+    } else {
+        // Subwindow doesn’t exist, create a new one
+        addCalendarView(cal);
+    }
+
+    // Update activeCal and focus
+    activeCal = calId;
+    editPane->setActiveCal(cal);
+    qDebug() << "MainWindow: Switched activeCal to" << calId;
+    qDebug() << "MainWindow: Focused on" << calId;
 }
 
 void MainWindow::addLocalBackend()
@@ -309,6 +386,18 @@ void MainWindow::onCollectionAdded(Collection *collection)
     activeCollection = collection;
     editPane->setCollection(collection);
     ui->logTextEdit->append("Collection opened: " + collection->name());
+
+    // Populate the tree model with the collection as the root
+    collectionModel->clear();
+    QStandardItem *rootItem = new QStandardItem(collection->name());
+    rootItem->setData(collection->id(), Qt::UserRole); // Store collection ID
+    collectionModel->appendRow(rootItem);
+
+    // Expand the root item
+    QTreeView *collectionTree = ui->propertiesDock->findChild<QTreeView*>("collectionTree");
+    if (collectionTree) {
+        collectionTree->expand(collectionModel->index(0, 0));
+    }
 }
 
 void MainWindow::onCalendarsLoaded(const QString &collectionId, const QList<CalendarMetadata> &calendars)
@@ -330,12 +419,24 @@ void MainWindow::onItemsLoaded(Cal *cal, QList<QSharedPointer<CalendarItem>> ite
     }
 }
 
-void MainWindow::onCalendarAdded(Cal *cal) // New slot
+void MainWindow::onCalendarAdded(Cal *cal)
 {
     qDebug() << "MainWindow: onCalendarAdded for" << cal->id();
+
+    // Add the calendar to the tree model
+    QStandardItem *rootItem = collectionModel->item(0); // Collection root
+    if (rootItem) {
+        QStandardItem *calItem = new QStandardItem(cal->name());
+        calItem->setData(cal->id(), Qt::UserRole); // Store calendar ID
+        rootItem->appendRow(calItem);
+    }
+
+    // Create the subwindow after adding to the tree
     addCalendarView(cal);
+
     if (activeCal.isEmpty()) {
         activeCal = cal->id(); // Set first calendar as active
+        editPane->setActiveCal(cal);
     }
 }
 
@@ -345,8 +446,15 @@ void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
         activeCal = "";
         editPane->setActiveCal(nullptr);
         qDebug() << "MainWindow: No active subwindow, cleared activeCal";
+
+        // Clear tree selection when no subwindow is active
+        QTreeView *collectionTree = ui->propertiesDock->findChild<QTreeView*>("collectionTree");
+        if (collectionTree) {
+            collectionTree->selectionModel()->clearSelection();
+        }
         return;
     }
+
     if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
         activeCal = view->activeCal()->id();
         editPane->setActiveCal(view->activeCal());
@@ -355,6 +463,31 @@ void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
             qDebug() << "MainWindow: Focused on" << activeCal;
         } else {
             qDebug() << "MainWindow: ActiveCal" << activeCal << "not found in m_calMap";
+        }
+
+        // Update tree selection to match the active subwindow
+        QTreeView *collectionTree = ui->propertiesDock->findChild<QTreeView*>("collectionTree");
+        if (collectionTree) {
+            QStandardItem *rootItem = collectionModel->item(0); // Collection root
+            if (rootItem) {
+                for (int i = 0; i < rootItem->rowCount(); ++i) {
+                    QStandardItem *calItem = rootItem->child(i);
+                    if (calItem && calItem->data(Qt::UserRole).toString() == activeCal) {
+                        QModelIndex index = collectionModel->indexFromItem(calItem);
+                        collectionTree->selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Remove closed subwindows from the map
+        for (auto it = calToSubWindow.begin(); it != calToSubWindow.end(); ) {
+            if (!ui->mdiArea->subWindowList().contains(it.value())) {
+                it = calToSubWindow.erase(it);
+            } else {
+                ++it;
+            }
         }
     }
 }
@@ -377,6 +510,35 @@ void MainWindow::onOpenCollection()
     collectionController->loadCollection("Loaded Collection", nullptr, false, filePath);
     ui->logTextEdit->append("Collection loaded from " + filePath);
     qDebug() << "MainWindow: Collection load requested from" << filePath;
+}
+
+void MainWindow::onCloseCollection()
+{
+    if (!activeCollection) {
+        ui->logTextEdit->append("No active collection to close");
+        return;
+    }
+
+    // Unload the collection from CollectionController
+    QString collectionId = activeCollection->id();
+    collectionController->unloadCollection(collectionId);
+
+    // Close all MDI subwindows
+    ui->mdiArea->closeAllSubWindows();
+    calToSubWindow.clear();
+
+    // Clear the tree model
+    collectionModel->clear();
+
+    // Reset state
+    activeCollection = nullptr;
+    activeCal = QString();
+    editPane->setCollection(nullptr);
+    editPane->setActiveCal(nullptr);
+    ui->valuePath->setText("(none)");
+
+    ui->logTextEdit->append("Collection closed");
+    qDebug() << "MainWindow: Collection closed";
 }
 
 void MainWindow::onCommitChanges()
