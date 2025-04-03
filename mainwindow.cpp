@@ -54,7 +54,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->editDock->setWidget(editPane->widget());
 
     // Tabify stageDock and propertiesDock
-    tabifyDockWidget(ui->stageDock, ui->propertiesDock); // Use 'this' implicitly
+    tabifyDockWidget(ui->logDock, ui->stageDock); // Use 'this' implicitly
 
     // Set minimum widths for docks
     ui->editDock->setMinimumWidth(200);
