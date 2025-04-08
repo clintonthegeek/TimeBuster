@@ -440,8 +440,16 @@ void MainWindow::onCalendarAdded(Cal *cal)
     }
 }
 
+
 void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
 {
+    if (!activeCollection) {
+        activeCal = QString();
+        editPane->setActiveCal(nullptr);
+        qDebug() << "MainWindow: No active collection, cleared activeCal";
+        return;
+    }
+
     if (!window) {
         activeCal = "";
         editPane->setActiveCal(nullptr);
@@ -456,14 +464,28 @@ void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
     }
 
     if (CalendarTableView *view = qobject_cast<CalendarTableView*>(window->widget())) {
-        activeCal = view->activeCal()->id();
-        editPane->setActiveCal(view->activeCal());
-        qDebug() << "MainWindow: Switched activeCal to" << activeCal;
-        if (collectionController->getCal(activeCal)) {
-            qDebug() << "MainWindow: Focused on" << activeCal;
-        } else {
-            qDebug() << "MainWindow: ActiveCal" << activeCal << "not found in m_calMap";
+        // Get the calendar ID and validate the Cal* pointer
+        Cal *cal = view->activeCal();
+        if (!cal) {
+            activeCal = "";
+            editPane->setActiveCal(nullptr);
+            qDebug() << "MainWindow: No active calendar in view, cleared activeCal";
+            return;
         }
+
+        QString calId = cal->id();
+        if (!collectionController->getCal(calId)) {
+            activeCal = "";
+            editPane->setActiveCal(nullptr);
+            qDebug() << "MainWindow: ActiveCal" << calId << "not found in m_calMap, cleared activeCal";
+            return;
+        }
+
+        // Calendar is valid, proceed with setting it as active
+        activeCal = calId;
+        editPane->setActiveCal(cal);
+        qDebug() << "MainWindow: Switched activeCal to" << activeCal;
+        qDebug() << "MainWindow: Focused on" << activeCal;
 
         // Update tree selection to match the active subwindow
         QTreeView *collectionTree = ui->propertiesDock->findChild<QTreeView*>("collectionTree");
@@ -492,7 +514,6 @@ void MainWindow::onSubWindowActivated(QMdiSubWindow *window)
     }
 }
 
-
 void MainWindow::onOpenCollection()
 {
     qDebug() << "MainWindow: Opening collection";
@@ -519,6 +540,14 @@ void MainWindow::onCloseCollection()
         return;
     }
 
+    // Clear active calendar state to avoid dangling pointers
+    activeCal = QString();
+    editPane->setActiveCal(nullptr);
+    editPane->setCollection(nullptr);
+
+    // Disconnect subWindowActivated to prevent signals during closing
+    disconnect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated);
+
     // Unload the collection from CollectionController
     QString collectionId = activeCollection->id();
     collectionController->unloadCollection(collectionId);
@@ -532,13 +561,13 @@ void MainWindow::onCloseCollection()
 
     // Reset state
     activeCollection = nullptr;
-    activeCal = QString();
-    editPane->setCollection(nullptr);
-    editPane->setActiveCal(nullptr);
     ui->valuePath->setText("(none)");
 
     ui->logTextEdit->append("Collection closed");
     qDebug() << "MainWindow: Collection closed";
+
+    // Reconnect subWindowActivated for future use
+    connect(ui->mdiArea, &QMdiArea::subWindowActivated, this, &MainWindow::onSubWindowActivated);
 }
 
 void MainWindow::onCommitChanges()

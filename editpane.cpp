@@ -55,6 +55,7 @@ void EditPane::setActiveCal(Cal *cal)
         m_activeCal = cal;
         emit calChanged(cal);
         qDebug() << "EditPane: Set activeCal to" << (cal ? cal->id() : "null");
+        refresh(); // Update the UI based on the new m_activeCal
     }
 }
 

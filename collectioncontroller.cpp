@@ -243,6 +243,7 @@ void CollectionController::onDataLoaded()
         }
     }
 }
+
 void CollectionController::onCalendarDiscovered(const QString &collectionId, const CalendarMetadata &calendar)
 {
     Collection *col = m_collections.value(collectionId);

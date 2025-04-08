@@ -2,6 +2,7 @@
 #define EDITPANE_H
 
 #include "viewinterface.h"
+#include "collectioncontroller.h" // Include CollectionController
 #include <QTableWidget>
 #include <QPushButton>
 #include <QVBoxLayout>
