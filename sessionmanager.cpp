@@ -4,7 +4,7 @@
 #include "cal.h"
 #include "calendaritem.h"
 #include "localbackend.h"
-#include "calendaritemfactory.h"
+//#include "calendaritemfactory.h"
 #include <QDebug>
 #include <QFile>
 #include <QDataStream>
