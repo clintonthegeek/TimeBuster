@@ -3,8 +3,11 @@
 #include "localbackend.h"
 #include "caldavbackend.h"
 #include "configmanager.h"
+#include "databasemanager.h"
 #include <QDebug>
 #include <algorithm> // For std::sort
+#include <QSqlDatabase>
+
 
 CollectionController::CollectionController(QObject *parent)
     : QObject(parent), m_collectionCounter(0)
@@ -167,12 +170,33 @@ bool CollectionController::saveCollection(const QString &collectionId, const QSt
     if (!savedPath.isEmpty()) {
         m_collectionToKalbPath[collectionId] = savedPath;
         qDebug() << "CollectionController: Saved collection" << collectionId << "to" << savedPath;
+
+        // --- New Code: Initialize the database in the .kalb folder ---
+        QFileInfo fi(savedPath);
+        QString dbDir = fi.absolutePath(); // Use the directory of the .kalb file
+        QString dbPath = dbDir + "/timebuster.db";
+        if (!QFile::exists(dbPath)) {
+            QSqlDatabase db;
+            if (DatabaseManager::initializeDatabase(collectionId, dbDir, db)) {
+                qDebug() << "CollectionController: Initialized database for collection" << collectionId << "at" << dbPath;
+                db.close();
+                // Remove the connection so that it doesn't persist after this operation.
+                QSqlDatabase::removeDatabase("dbmanager_" + collectionId);
+            } else {
+                qDebug() << "CollectionController: Failed to initialize database for collection" << collectionId;
+            }
+        } else {
+            qDebug() << "CollectionController: Database already exists for collection" << collectionId;
+        }
+        // --- End New Code ---
+
         return true;
     } else {
         qDebug() << "CollectionController: Failed to save collection" << collectionId;
         return false;
     }
 }
+
 
 bool CollectionController::isTransient(const QString &collectionId) const
 {
