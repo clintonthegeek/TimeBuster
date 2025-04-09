@@ -51,6 +51,7 @@ CalendarItem* Event::clone(QObject *parent) const
     // Replace setEtag with setVersionIdentifier
     clone->setVersionIdentifier(m_etag);
     clone->setDirty(m_dirty);
+    clone->setConflictStatus(m_conflictStatus);
     return clone;
 }
 
@@ -155,6 +156,7 @@ CalendarItem* Todo::clone(QObject *parent) const
     // Replace setEtag with setVersionIdentifier
     clone->setVersionIdentifier(m_etag);
     clone->setDirty(m_dirty);
+    clone->setConflictStatus(m_conflictStatus);
     return clone;
 }
 

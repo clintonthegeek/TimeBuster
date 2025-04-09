@@ -50,6 +50,21 @@ public:
     virtual bool allDay() const = 0;
     virtual void setAllDay(bool allDay) = 0;
 
+    // Define an enum to track conflict status.
+    enum class ConflictStatus {
+        None,
+        Pending,
+        Resolved
+    };
+
+    // Getter and setter for conflict status.
+    ConflictStatus conflictStatus() const { return m_conflictStatus; }
+    void setConflictStatus(ConflictStatus status) { m_conflictStatus = status; }
+
+protected:
+    ConflictStatus m_conflictStatus = ConflictStatus::None;
+
+
 protected:
     QString m_calId;
     QString m_itemId;

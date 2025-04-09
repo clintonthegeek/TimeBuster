@@ -286,14 +286,23 @@ void CollectionController::onItemLoaded(Cal *tempCal, QSharedPointer<CalendarIte
         QList<BackendInfo> backends = m_backends.value(collectionId);
         if (!backends.isEmpty()) {
             SyncBackend *backend = backends.first().backend;
-            QString verId = backend->fetchItemVersionIdentifier(realCal->id(), item->id());
-            item->setVersionIdentifier(verId);
+            QString newVer = backend->fetchItemVersionIdentifier(realCal->id(), item->id());
+            QString oldVer = item->versionIdentifier();
+            if (!oldVer.isEmpty() && oldVer != newVer) {
+                qDebug() << "CollectionController: Conflict detected for item" << item->id()
+                << ": stored version =" << oldVer << ", new version =" << newVer;
+                item->setConflictStatus(CalendarItem::ConflictStatus::Pending);
+            } else {
+                item->setConflictStatus(CalendarItem::ConflictStatus::None);
+            }
+            item->setVersionIdentifier(newVer);
             qDebug() << "CollectionController: Set versionIdentifier for item"
-                     << item->id() << "to" << verId;
+                     << item->id() << "to" << newVer;
         }
     }
     emit itemAdded(realCal, item);
 }
+
 
 
 void CollectionController::onCalendarLoaded(Cal *tempCal)
