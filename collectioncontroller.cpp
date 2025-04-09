@@ -276,10 +276,25 @@ void CollectionController::onItemLoaded(Cal *tempCal, QSharedPointer<CalendarIte
         qWarning() << "CollectionController: No real Cal for" << tempCal->id() << "on item load";
         return;
     }
-    // qDebug() << "CollectionController: Adding item" << item->id() << "to" << realCal->id();
     realCal->addItem(item);
+
+    // If the item is not dirty, fetch the version identifier from the backend.
+    if (!item->isDirty()) {
+        // For simplicity, assume a single backend per collection.
+        // Extract collection ID from the cal's id (assuming format "col0_calendarName").
+        QString collectionId = realCal->id().split("_").first();
+        QList<BackendInfo> backends = m_backends.value(collectionId);
+        if (!backends.isEmpty()) {
+            SyncBackend *backend = backends.first().backend;
+            QString verId = backend->fetchItemVersionIdentifier(realCal->id(), item->id());
+            item->setVersionIdentifier(verId);
+            qDebug() << "CollectionController: Set versionIdentifier for item"
+                     << item->id() << "to" << verId;
+        }
+    }
     emit itemAdded(realCal, item);
 }
+
 
 void CollectionController::onCalendarLoaded(Cal *tempCal)
 {

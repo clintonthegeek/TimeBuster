@@ -219,8 +219,10 @@ void CalDAVBackend::processNextItemLoad()
                     }
                     if (calItem) {
                         calItem->setIncidence(incidence);
-                        emit itemLoaded(cal, calItem);
+                        QString verId = fetchItemVersionIdentifier(calId, calItem->id());
+                        emit itemLoaded(cal, calItem, verId);
                     }
+
                 }
                 emit calendarLoaded(cal);
             }
@@ -237,4 +239,19 @@ void CalDAVBackend::processNextItemLoad()
     qDebug() << "CalDAVBackend: Starting items list job for" << calId << "Job:" << listJob;
     m_activeJobs.append(listJob);
     listJob->start();
+}
+
+QString CalDAVBackend::fetchItemVersionIdentifier(const QString &calId, const QString &itemId)
+{
+    Q_UNUSED(calId);
+    Q_UNUSED(itemId);
+    // For now, return a stub version identifier.
+    qDebug() << "CalDAVBackend: fetchItemVersionIdentifier stub called for" << calId << itemId;
+    return QString("stub-etag");
+}
+
+void CalDAVBackend::removeItem(const QString &calId, const QString &itemId)
+{
+    qDebug() << "CalDAVBackend: removeItem stub called for" << calId << itemId;
+    // This stub does nothing. In the future, implement deletion via an appropriate KDAV delete job.
 }

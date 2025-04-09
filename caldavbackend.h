@@ -26,6 +26,10 @@ public:
 
     void startSync(const QString &collectionId) override;
 
+    QString fetchItemVersionIdentifier(const QString &calId, const QString &itemId) override;
+    void removeItem(const QString &calId, const QString &itemId) override;
+
+
     QString serverUrl() const { return m_serverUrl; }
     QString username() const { return m_username; }
     QString password() const { return m_password; }

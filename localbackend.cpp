@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDebug>
+#include <QCryptographicHash>
 
 LocalBackend::LocalBackend(const QString &rootPath, QObject *parent)
     : SyncBackend(parent), m_rootPath(rootPath)
@@ -105,7 +106,7 @@ QList<QSharedPointer<CalendarItem>> LocalBackend::loadItems(Cal *cal)
         item->setIncidence(incidence);
         QFileInfo fileInfo(filePath);
         item->setLastModified(fileInfo.lastModified());
-        item->setEtag(""); // No ETag for local files
+        item->setVersionIdentifier(""); // No ETag for local files
         items.append(item);
         m_idToPath[itemId] = filePath;
     }
@@ -125,7 +126,8 @@ void LocalBackend::startSync(const QString &collectionId)
         QList<QSharedPointer<CalendarItem>> items = loadItems(&tempCal);
         qDebug() << "LocalBackend: Loaded" << items.size() << "items for" << meta.id;
         for (const QSharedPointer<CalendarItem> &item : items) {
-            emit itemLoaded(&tempCal, item);
+            QString verId = fetchItemVersionIdentifier(tempCal.id(), item->id());
+            emit itemLoaded(&tempCal, item, verId);
         }
         emit calendarLoaded(&tempCal);
     }
@@ -236,4 +238,47 @@ void LocalBackend::updateItem(const QString &calId, const QString &itemId, const
     }
     file.close();
     // No dataLoaded—caller should handle completion
+}
+
+QString LocalBackend::fetchItemVersionIdentifier(const QString &calId, const QString &itemId)
+{
+    Q_UNUSED(calId);
+    QString filePath = m_idToPath.value(itemId);
+    if (filePath.isEmpty()) {
+        qWarning() << "LocalBackend: No file path found for item" << itemId;
+        return QString();
+    }
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "LocalBackend: Failed to open file" << filePath;
+        return QString();
+    }
+    QByteArray data = file.readAll();
+    file.close();
+    // Use MD5 for a lightweight hash; collisions are extremely unlikely in our use case.
+    QByteArray md5 = QCryptographicHash::hash(data, QCryptographicHash::Md5);
+    QString verId = QString::fromUtf8(md5.toHex());
+    qDebug() << "LocalBackend: Computed version identifier for item" << itemId << ":" << verId;
+    return verId;
+}
+
+void LocalBackend::removeItem(const QString &calId, const QString &itemId)
+{
+    Q_UNUSED(calId);
+    QString filePath = m_idToPath.value(itemId);
+    if (filePath.isEmpty()) {
+        qWarning() << "LocalBackend: No file path found for item" << itemId;
+        return;
+    }
+    QFile file(filePath);
+    if (file.exists()) {
+        if (!file.remove()) {
+            qWarning() << "LocalBackend: Failed to remove file" << filePath << ":" << file.errorString();
+        } else {
+            m_idToPath.remove(itemId);
+            qDebug() << "LocalBackend: Successfully removed item" << itemId;
+        }
+    } else {
+        qWarning() << "LocalBackend: File" << filePath << "does not exist for item" << itemId;
+    }
 }

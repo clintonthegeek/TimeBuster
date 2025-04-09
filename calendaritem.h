@@ -26,8 +26,8 @@ public:
     QString calId() const { return m_calId; }
     QDateTime lastModified() const { return m_lastModified; }
     void setLastModified(const QDateTime &lastModified) { m_lastModified = lastModified; }
-    QString etag() const { return m_etag; }
-    void setEtag(const QString &etag) { m_etag = etag; }
+    QString versionIdentifier() const { return m_etag; }
+    void setVersionIdentifier(const QString &id) { m_etag = id; }
 
     bool isDirty() const { return m_dirty; }
     void setDirty(bool dirty) { m_dirty = dirty; }

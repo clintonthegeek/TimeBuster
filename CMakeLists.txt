@@ -30,7 +30,6 @@ add_library(TimeBusterCore SHARED
     collectioninfowidget.h collectioninfowidget.cpp
     databasemanager.h databasemanager.cpp
     sessionmanager.h sessionmanager.cpp
-    calendaritemfactory.h calendaritemfactory.cpp
 
     backendinfo.h
     viewinterface.h viewinterface.cpp

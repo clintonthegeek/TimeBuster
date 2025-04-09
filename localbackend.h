@@ -22,6 +22,10 @@ public:
 
     void startSync(const QString &collectionId) override;
 
+    // New implementations for the abstract functions
+    QString fetchItemVersionIdentifier(const QString &calId, const QString &itemId) override;
+    void removeItem(const QString &calId, const QString &itemId) override;
+
 private:
     QString m_rootPath;
     QMap<QString, QString> m_idToPath; // Retained for storage/update

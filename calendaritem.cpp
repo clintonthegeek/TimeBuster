@@ -48,10 +48,12 @@ CalendarItem* Event::clone(QObject *parent) const
     Event *clone = new Event(m_calId, m_itemId.split("_").last(), parent);
     clone->setIncidence(KCalendarCore::Incidence::Ptr(m_incidence->clone()));
     clone->setLastModified(m_lastModified);
-    clone->setEtag(m_etag);
+    // Replace setEtag with setVersionIdentifier
+    clone->setVersionIdentifier(m_etag);
     clone->setDirty(m_dirty);
     return clone;
 }
+
 
 QDateTime Event::dtStart() const
 {
@@ -150,10 +152,12 @@ CalendarItem* Todo::clone(QObject *parent) const
     Todo *clone = new Todo(m_calId, m_itemId.split("_").last(), parent);
     clone->setIncidence(KCalendarCore::Incidence::Ptr(m_incidence->clone()));
     clone->setLastModified(m_lastModified);
-    clone->setEtag(m_etag);
+    // Replace setEtag with setVersionIdentifier
+    clone->setVersionIdentifier(m_etag);
     clone->setDirty(m_dirty);
     return clone;
 }
+
 
 QDateTime Todo::dtStart() const
 {
