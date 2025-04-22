@@ -8,6 +8,8 @@ This is the second attempt at "vibe coding" a calendar program, mostly ping-pong
 
 I found the work of engineering the software cognitively demanding and getting into a flowstate was extremely rewarding. It was a lot like playing a video game.
 
+Reading through the commits should give you a pretty good high-level overview of the features.
+
 Maybe one-day, once I get better and learn more (or when AI gets better), I can pick up and continue hacking on this beast; it has features I haven't seen anywhere else, like granular change tracking saved to the hard drive for every action, etc. It uses KDE libraries like `KCalendarCore` and `KDAV`—unlike my first program, which included its own raw `.ics` parser and `CalDAV` sync implementation, created by feeding entire RFC documents into the LLM!
 
 # Server Credentials
