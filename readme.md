@@ -10,6 +10,10 @@ I found the work of engineering the software cognitively demanding and getting i
 
 Maybe one-day, once I get better and learn more (or when AI gets better), I can pick up and continue hacking on this beast; it has features I haven't seen anywhere else, like granular change tracking saved to the hard drive for every action, etc. It uses KDE libraries like `KCalendarCore` and `KDAV`—unlike my first program, which included its own raw `.ics` parser and `CalDAV` sync implementation, created by feeding entire RFC documents into the LLM!
 
+# Server Credentials
+
+Funny story: I uploaded this source last night on a whim after a few beers, and then 20 minutes later realized that I had left the password to my remote CalDAV server hard-coded into the credentials dialog! Rest assured, I have changed my password; this is why unique passwords are important, folks! 😂
+
 # License
 
 The use of LLMs to generate code is legally contentious and ethically dubious in the Free Software world. I figure that, if I'm going to be using LLMs this way, releasing all the code I produce this way as GPL3 is the least-bad strategy for doing so.
